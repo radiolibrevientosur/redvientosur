@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   register: async (email: string, password: string, username: string, displayName: string) => {
     set({ isLoading: true });
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -65,8 +65,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
       });
       if (error) throw error;
-      toast.success('¡Registro exitoso! Revisa tu correo para verificar tu cuenta antes de iniciar sesión.');
-      set({ isAuthenticated: false, user: null, isLoading: false });
+      // Si el usuario está confirmado, hacer login automático
+      if (data.user && data.user.aud === 'authenticated' && !data.user.confirmed_at) {
+        toast.success('¡Registro exitoso! Revisa tu correo para verificar tu cuenta antes de iniciar sesión.');
+        set({ isAuthenticated: false, user: null, isLoading: false });
+      } else {
+        // Intentar login automático
+        await useAuthStore.getState().login(email, password);
+      }
     } catch (error) {
       set({ isAuthenticated: false, user: null, isLoading: false });
       toast.error(error instanceof Error ? error.message : 'Registration failed');

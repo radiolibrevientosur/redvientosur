@@ -12,11 +12,15 @@ const TopBar: React.FC = () => {
   
   const getPageTitle = () => {
     switch (location.pathname) {
-      case '/': return 'Home';
-      case '/favorites': return 'Favorites';
-      case '/create': return 'Create';
-      case '/calendar': return 'Calendar';
-      case '/profile': return 'Profile';
+      case '/': return 'Inicio';
+      case '/favorites': return 'Favoritos';
+      case '/create': return 'Crear';
+      case '/calendar': return 'Calendario';
+      case '/profile': return 'Perfil';
+      case '/blogs': return 'Blogs';
+      case '/stories': return 'Stories';
+      case '/streams': return 'En Vivo';
+      case '/messages': return 'Mensajes';
       default: return '';
     }
   };
@@ -35,7 +39,7 @@ const TopBar: React.FC = () => {
               </button>
             ) : (
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                SocialPulse
+                Red Viento Sur
               </h1>
             )}
           </div>
@@ -51,14 +55,14 @@ const TopBar: React.FC = () => {
           <div className="flex items-center justify-end w-1/3 space-x-1">
             <button 
               className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-              aria-label="Search"
+              aria-label="Buscar"
             >
               <Search className="h-5 w-5 text-gray-700 dark:text-gray-300" />
             </button>
             
             <button 
               className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-              aria-label="Notifications"
+              aria-label="Notificaciones"
             >
               <BellDot className="h-5 w-5 text-gray-700 dark:text-gray-300" />
             </button>
@@ -66,7 +70,7 @@ const TopBar: React.FC = () => {
             <button 
               onClick={toggleTheme}
               className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label={theme === 'dark' ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
             >
               {theme === 'dark' ? (
                 <Sun className="h-5 w-5 text-gray-300" />

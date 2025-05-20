@@ -1,17 +1,17 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BookmarkCheck, PlusSquare, Calendar, User } from 'lucide-react';
+import { Home, BookmarkCheck, PlusSquare, Calendar, User, BookOpen, Radio, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const BottomNavigation: React.FC = () => {
   const location = useLocation();
   
   const navItems = [
-    { path: '/', icon: Home, label: 'Home' },
-    { path: '/favorites', icon: BookmarkCheck, label: 'Favorites' },
-    { path: '/create', icon: PlusSquare, label: 'Create' },
-    { path: '/calendar', icon: Calendar, label: 'Calendar' },
-    { path: '/profile', icon: User, label: 'Profile' }
+    { path: '/', icon: Home, label: 'Inicio' },
+    { path: '/blogs', icon: BookOpen, label: 'Blogs' },
+    { path: '/create', icon: PlusSquare, label: 'Crear' },
+    { path: '/streams', icon: Radio, label: 'En Vivo' },
+    { path: '/profile', icon: User, label: 'Perfil' }
   ];
   
   return (

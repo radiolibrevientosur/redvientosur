@@ -14,6 +14,12 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
+// New pages
+const BlogsPage = lazy(() => import('./pages/BlogsPage'));
+const StoriesPage = lazy(() => import('./pages/StoriesPage'));
+const StreamsPage = lazy(() => import('./pages/StreamsPage'));
+const MessagesPage = lazy(() => import('./pages/MessagesPage'));
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   
@@ -41,6 +47,10 @@ const AppRoutes = () => {
           <Route path="create" element={<CreatePage />} />
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="blogs" element={<BlogsPage />} />
+          <Route path="stories" element={<StoriesPage />} />
+          <Route path="streams" element={<StreamsPage />} />
+          <Route path="messages" element={<MessagesPage />} />
         </Route>
         
         <Route path="*" element={<NotFoundPage />} />

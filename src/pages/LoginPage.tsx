@@ -15,7 +15,7 @@ const LoginPage = () => {
     e.preventDefault();
     
     if (!email.trim() || !password.trim()) {
-      toast.error('Please fill in all fields');
+      toast.error('Por favor, completa todos los campos');
       return;
     }
     
@@ -25,20 +25,20 @@ const LoginPage = () => {
       await login(email, password);
       navigate('/');
     } catch (error) {
-      // Error toast is handled in the store
+      // El toast de error se maneja en el store
       setIsSubmitting(false);
     }
   };
   
-  // Default login (for demo purposes)
+  // Login predeterminado (para fines de demostración)
   const handleDemoLogin = async () => {
-    setEmail('user@example.com');
+    setEmail('usuario@ejemplo.com');
     setPassword('password123');
     
     setIsSubmitting(true);
     
     try {
-      await login('user@example.com', 'password123');
+      await login('usuario@ejemplo.com', 'password123');
       navigate('/');
     } catch (error) {
       setIsSubmitting(false);
@@ -50,10 +50,10 @@ const LoginPage = () => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-            SocialPulse
+            Red Viento Sur
           </h1>
           <h2 className="mt-6 text-xl font-bold text-gray-900 dark:text-white">
-            Sign in to your account
+            Inicia sesión en tu cuenta
           </h2>
         </div>
         
@@ -61,7 +61,7 @@ const LoginPage = () => {
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Email address
+                Correo electrónico
               </label>
               <div className="mt-1">
                 <input
@@ -79,7 +79,7 @@ const LoginPage = () => {
             
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password
+                Contraseña
               </label>
               <div className="mt-1">
                 <input
@@ -104,13 +104,13 @@ const LoginPage = () => {
                   className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                  Remember me
+                  Recordarme
                 </label>
               </div>
               
               <div className="text-sm">
                 <a href="#" className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400">
-                  Forgot your password?
+                  ¿Olvidaste tu contraseña?
                 </a>
               </div>
             </div>
@@ -121,7 +121,7 @@ const LoginPage = () => {
                 disabled={isSubmitting}
                 className="btn btn-primary w-full py-2"
               >
-                {isSubmitting ? 'Signing in...' : 'Sign in'}
+                {isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
               </button>
             </div>
           </form>
@@ -133,7 +133,7 @@ const LoginPage = () => {
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                  Or continue with
+                  O continuar con
                 </span>
               </div>
             </div>
@@ -144,15 +144,15 @@ const LoginPage = () => {
                 onClick={handleDemoLogin}
                 className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
-                Demo Account
+                Cuenta de Demostración
               </button>
             </div>
           </div>
           
           <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            Don't have an account?{' '}
+            ¿No tienes una cuenta?{' '}
             <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400">
-              Sign up
+              Regístrate
             </Link>
           </p>
         </div>

@@ -17,7 +17,7 @@ const RegisterPage = () => {
     e.preventDefault();
     
     if (!email.trim() || !password.trim() || !username.trim() || !displayName.trim()) {
-      toast.error('Please fill in all fields');
+      toast.error('Por favor, completa todos los campos');
       return;
     }
     
@@ -37,10 +37,10 @@ const RegisterPage = () => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center">
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">
-            SocialPulse
+            Red Viento Sur
           </h1>
           <h2 className="mt-6 text-xl font-bold text-gray-900 dark:text-white">
-            Create an account
+            Crear una cuenta
           </h2>
         </div>
         
@@ -48,7 +48,7 @@ const RegisterPage = () => {
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label htmlFor="display-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Display Name
+                Nombre completo
               </label>
               <div className="mt-1">
                 <input
@@ -65,7 +65,7 @@ const RegisterPage = () => {
             
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Username
+                Nombre de usuario
               </label>
               <div className="mt-1">
                 <div className="flex">
@@ -87,7 +87,7 @@ const RegisterPage = () => {
             
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Email address
+                Correo electrónico
               </label>
               <div className="mt-1">
                 <input
@@ -105,7 +105,7 @@ const RegisterPage = () => {
             
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password
+                Contraseña
               </label>
               <div className="mt-1">
                 <input
@@ -120,7 +120,7 @@ const RegisterPage = () => {
                 />
               </div>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                Password must be at least 8 characters long
+                La contraseña debe tener al menos 8 caracteres
               </p>
             </div>
             
@@ -130,15 +130,15 @@ const RegisterPage = () => {
                 disabled={isSubmitting}
                 className="btn btn-primary w-full py-2"
               >
-                {isSubmitting ? 'Creating account...' : 'Create account'}
+                {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
               </button>
             </div>
           </form>
           
           <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
-            Already have an account?{' '}
+            ¿Ya tienes una cuenta?{' '}
             <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500 dark:text-primary-400">
-              Sign in
+              Inicia sesión
             </Link>
           </p>
         </div>

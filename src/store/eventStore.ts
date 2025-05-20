@@ -125,44 +125,49 @@ export const useEventStore = create<EventState>((set, get) => ({
   updateEvent: async (id, eventData) => {
     set({ isLoading: true, error: null });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      set(state => ({
-        events: state.events.map(event => 
-          event.id === id ? { ...event, ...eventData } : event
-        ),
-        isLoading: false
-      }));
-      
-      toast.success('Event updated successfully!');
+      // Actualizar evento en Supabase
+      const { error } = await supabase
+        .from('eventos')
+        .update({
+          titulo: eventData.title,
+          descripcion: eventData.description,
+          tipo: eventData.type,
+          fecha_inicio: eventData.date,
+          hora: eventData.time,
+          ubicacion: eventData.location
+        })
+        .eq('id', id);
+      if (error) throw error;
+      await get().fetchEvents();
+      set({ isLoading: false });
+      toast.success('Evento actualizado exitosamente!');
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to update event', 
         isLoading: false 
       });
-      toast.error('Failed to update event');
+      toast.error('Error al actualizar el evento');
     }
   },
   
   deleteEvent: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      set(state => ({
-        events: state.events.filter(event => event.id !== id),
-        isLoading: false
-      }));
-      
-      toast.success('Event deleted successfully!');
+      // Eliminar evento en Supabase
+      const { error } = await supabase
+        .from('eventos')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      await get().fetchEvents();
+      set({ isLoading: false });
+      toast.success('Evento eliminado exitosamente!');
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Failed to delete event', 
         isLoading: false 
       });
-      toast.error('Failed to delete event');
+      toast.error('Error al eliminar el evento');
     }
   },
   

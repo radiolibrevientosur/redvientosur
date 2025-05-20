@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
 import { addDays, format, parse, startOfToday } from 'date-fns';
+import { supabase } from '../lib/supabase';
 
 export type EventType = 'event' | 'task' | 'birthday';
 
@@ -70,15 +71,27 @@ export const useEventStore = create<EventState>((set, get) => ({
   fetchEvents: async () => {
     set({ isLoading: true, error: null });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // In a real app, fetch events from API
-      set({ events: INITIAL_EVENTS, isLoading: false });
+      const { data, error } = await supabase
+        .from('eventos')
+        .select('*')
+        .order('creado_en', { ascending: false });
+      if (error) throw error;
+      const events: Event[] = (data || []).map((e: any) => ({
+        id: e.id,
+        title: e.titulo,
+        description: e.descripcion,
+        type: e.tipo,
+        date: e.fecha,
+        time: e.hora,
+        location: e.ubicacion,
+        userId: e.usuario_id,
+        createdAt: e.creado_en
+      }));
+      set({ events, isLoading: false });
     } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to fetch events', 
-        isLoading: false 
+      set({
+        error: error instanceof Error ? error.message : 'Failed to fetch events',
+        isLoading: false
       });
     }
   },
@@ -86,25 +99,24 @@ export const useEventStore = create<EventState>((set, get) => ({
   addEvent: async (event) => {
     set({ isLoading: true, error: null });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      const newEvent: Event = {
-        ...event,
-        id: Math.random().toString(36).substring(2, 9),
-        createdAt: new Date().toISOString()
-      };
-      
-      set(state => ({ 
-        events: [...state.events, newEvent],
-        isLoading: false 
-      }));
-      
-      toast.success('Event created successfully!');
+      const { error } = await supabase.from('eventos').insert([
+        {
+          titulo: event.title,
+          descripcion: event.description,
+          tipo: event.type,
+          fecha_inicio: event.date, // date es ISO string
+          hora: event.time, // si existe el campo en la tabla, si no, omitir
+          ubicacion: event.location,
+          creador_id: event.userId
+        }
+      ]);
+      if (error) throw error;
+      await get().fetchEvents();
+      toast.success('Evento creado exitosamente!');
     } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to create event', 
-        isLoading: false 
+      set({
+        error: error instanceof Error ? error.message : 'Failed to create event',
+        isLoading: false
       });
       toast.error('Failed to create event');
     }

@@ -1,23 +1,12 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-
-// Mock user data for demo
-const MOCK_USERS = [
-  {
-    id: '1',
-    email: 'user@example.com',
-    password: 'password123',
-    username: 'johndoe',
-    displayName: 'John Doe',
-    avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100'
-  }
-];
+import { supabase } from '../lib/supabase';
 
 interface User {
   id: string;
   email: string;
-  username: string;
-  displayName: string;
+  username?: string;
+  displayName?: string;
   avatar?: string;
 }
 
@@ -38,61 +27,48 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
   
   login: async (email: string, password: string) => {
+    set({ isLoading: true });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Find user (In a real app, this would be an API call)
-      const user = MOCK_USERS.find(u => u.email === email && u.password === password);
-      
-      if (!user) {
-        throw new Error('Invalid credentials');
-      }
-      
-      const { password: _, ...userData } = user;
-      
-      // Save to localStorage (in real app, would save auth token)
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      set({ isAuthenticated: true, user: userData, isLoading: false });
-      toast.success('Successfully logged in!');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      if (error) throw error;
+      const userData = data.user;
+      if (!userData) throw new Error('No user data returned');
+      // Mapear los datos personalizados desde user_metadata
+      const mappedUser: User = {
+        id: userData.id,
+        email: userData.email ?? '',
+        username: userData.user_metadata?.username,
+        displayName: userData.user_metadata?.displayName,
+        avatar: userData.user_metadata?.avatar
+      };
+      localStorage.setItem('user', JSON.stringify(mappedUser));
+      set({ isAuthenticated: true, user: mappedUser, isLoading: false });
+      toast.success('¡Inicio de sesión exitoso!');
     } catch (error) {
+      set({ isAuthenticated: false, user: null, isLoading: false });
       toast.error(error instanceof Error ? error.message : 'Login failed');
       throw error;
     }
   },
   
   register: async (email: string, password: string, username: string, displayName: string) => {
+    set({ isLoading: true });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Check if user already exists
-      if (MOCK_USERS.some(u => u.email === email)) {
-        throw new Error('User already exists');
-      }
-      
-      // Create new user (In a real app, this would be an API call)
-      const newUser = {
-        id: Math.random().toString(36).substring(2, 9),
+      const { error } = await supabase.auth.signUp({
         email,
         password,
-        username,
-        displayName,
-        avatar: `https://ui-avatars.com/api/?name=${displayName}&background=random`
-      };
-      
-      // In real app, would push to database
-      MOCK_USERS.push(newUser);
-      
-      const { password: _, ...userData } = newUser;
-      
-      // Save to localStorage (in real app, would save auth token)
-      localStorage.setItem('user', JSON.stringify(userData));
-      
-      set({ isAuthenticated: true, user: userData, isLoading: false });
-      toast.success('Successfully registered!');
+        options: {
+          data: { username, displayName }
+        }
+      });
+      if (error) throw error;
+      toast.success('¡Registro exitoso!');
+      set({ isAuthenticated: false, user: null, isLoading: false });
     } catch (error) {
+      set({ isAuthenticated: false, user: null, isLoading: false });
       toast.error(error instanceof Error ? error.message : 'Registration failed');
       throw error;
     }

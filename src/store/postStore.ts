@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '../lib/supabase';
 
 // Types
 export type PostType = 'text' | 'image' | 'video' | 'audio' | 'document';
@@ -117,15 +118,33 @@ export const usePostStore = create<PostState>((set, get) => ({
   fetchPosts: async () => {
     set({ isLoading: true, error: null });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // In a real app, fetch posts from API
-      set({ posts: INITIAL_POSTS, isLoading: false });
+      const { data, error } = await supabase
+        .from('publicaciones')
+        .select(`*, autor:usuarios(*), comentarios(*), reacciones(*)`)
+        .order('creado_en', { ascending: false });
+      if (error) throw error;
+      // Mapear los datos de Supabase al tipo Post
+      const posts: Post[] = (data || []).map((p: any) => ({
+        id: p.id,
+        userId: p.autor_id || '',
+        type: p.tipo as PostType,
+        content: p.contenido || '',
+        mediaUrl: Array.isArray(p.multimedia_url) ? p.multimedia_url[0] : undefined,
+        createdAt: p.creado_en || '',
+        likes: (p.reacciones || []).map((r: any) => r.usuario_id),
+        comments: (p.comentarios || []).map((c: any) => ({
+          id: c.id,
+          userId: c.usuario_id,
+          content: c.contenido,
+          createdAt: c.creado_en
+        })),
+        isFavorite: false // Puedes ajustar esto según tu lógica de favoritos
+      }));
+      set({ posts, isLoading: false });
     } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to fetch posts', 
-        isLoading: false 
+      set({
+        error: error instanceof Error ? error.message : 'Failed to fetch posts',
+        isLoading: false
       });
     }
   },

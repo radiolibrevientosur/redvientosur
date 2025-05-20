@@ -21,7 +21,8 @@
 
 -- Habilitar extensiones necesarias
 create extension if not exists "uuid-ossp";
-create extension if not exists "pg_crypto";
+-- pg_crypto is not available, using pgcrypto instead
+create extension if not exists "pgcrypto";
 
 -- Tabla de usuarios (extiende auth.users)
 create table if not exists usuarios (

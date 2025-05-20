@@ -65,7 +65,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         }
       });
       if (error) throw error;
-      toast.success('¡Registro exitoso!');
+      toast.success('¡Registro exitoso! Revisa tu correo para verificar tu cuenta antes de iniciar sesión.');
       set({ isAuthenticated: false, user: null, isLoading: false });
     } catch (error) {
       set({ isAuthenticated: false, user: null, isLoading: false });

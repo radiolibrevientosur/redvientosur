@@ -101,19 +101,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     toast.info('You have been logged out');
   },
   
-  checkAuth: () => {
-    const userData = localStorage.getItem('user');
-    
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        set({ isAuthenticated: true, user, isLoading: false });
-      } catch (e) {
-        localStorage.removeItem('user');
-        set({ isAuthenticated: false, user: null, isLoading: false });
-      }
+  checkAuth: async () => {
+    // Intenta obtener la sesión actual de Supabase
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const userData = session.user;
+      const mappedUser = {
+        id: userData.id,
+        email: userData.email ?? '',
+        username: userData.user_metadata?.username,
+        displayName: userData.user_metadata?.displayName,
+        avatar: userData.user_metadata?.avatar
+      };
+      localStorage.setItem('user', JSON.stringify(mappedUser));
+      set({ isAuthenticated: true, user: mappedUser, isLoading: false });
     } else {
-      set({ isLoading: false });
+      localStorage.removeItem('user');
+      set({ isAuthenticated: false, user: null, isLoading: false });
     }
   }
 }));

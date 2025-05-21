@@ -30,21 +30,6 @@ const LoginPage = () => {
     }
   };
   
-  // Login predeterminado (para fines de demostración)
-  const handleDemoLogin = async () => {
-    setEmail('usuario@ejemplo.com');
-    setPassword('password123');
-    
-    setIsSubmitting(true);
-    
-    try {
-      await login('usuario@ejemplo.com', 'password123');
-      navigate('/');
-    } catch (error) {
-      setIsSubmitting(false);
-    }
-  };
-  
   return (
     <div className="min-h-screen flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 bg-gray-50 dark:bg-gray-900">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -141,10 +126,20 @@ const LoginPage = () => {
             <div className="mt-6">
               <button
                 type="button"
-                onClick={handleDemoLogin}
+                onClick={async () => {
+                  try {
+                    setIsSubmitting(true);
+                    // Importa el store dinámicamente para evitar problemas de contexto
+                    const { useAuthStore } = await import('../store/authStore');
+                    await useAuthStore.getState().loginWithGoogle();
+                  } finally {
+                    setIsSubmitting(false);
+                  }
+                }}
                 className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
               >
-                Cuenta de Demostración
+                <svg className="w-5 h-5 mr-2" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123.1 24.5 166.3 64.9l-67.5 64.9C316.4 81.6 285.7 72 248 72c-97.2 0-176 78.8-176 184s78.8 184 176 184c112.4 0 154.7-80.7 161.3-122.7H248v-98.5h240c2.2 12.7 3.7 25.7 3.7 41z"></path></svg>
+                Entrar con Google
               </button>
             </div>
           </div>

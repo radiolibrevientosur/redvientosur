@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Book, Heart, MessageCircle, BookmarkCheck, User, Calendar, ArrowRight } from 'lucide-react';
+import { Book, Heart, MessageCircle, User, Calendar, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';

@@ -152,30 +152,29 @@ export const usePostStore = create<PostState>((set, get) => ({
   addPost: async (post) => {
     set({ isLoading: true, error: null });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const newPost: Post = {
-        ...post,
-        id: Math.random().toString(36).substring(2, 9),
-        createdAt: new Date().toISOString(),
-        likes: [],
-        comments: [],
-        isFavorite: false
-      };
-      
-      set(state => ({ 
-        posts: [newPost, ...state.posts],
-        isLoading: false 
-      }));
-      
-      toast.success('Post created successfully!');
+      // Insertar post real en Supabase
+      const { error } = await supabase.from('publicaciones').insert([
+        {
+          autor_id: post.userId,
+          titulo: post.content.substring(0, 60) || 'Sin título',
+          contenido: post.content,
+          excerpt: post.content.substring(0, 120),
+          imagen_portada: post.mediaUrl,
+          categoria: 'General', // Puedes ajustar esto según tu UI
+          tipo: post.type,
+          publicado_en: new Date().toISOString(),
+          actualizado_en: new Date().toISOString()
+        }
+      ]);
+      if (error) throw error;
+      await get().fetchPosts();
+      toast.success('¡Publicación creada exitosamente!');
     } catch (error) {
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to create post', 
+        error: error instanceof Error ? error.message : 'Error al crear publicación', 
         isLoading: false 
       });
-      toast.error('Failed to create post');
+      toast.error('Error al crear publicación');
     }
   },
   

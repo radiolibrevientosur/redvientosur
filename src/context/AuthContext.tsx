@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { supabase } from '../lib/supabase';
 
 interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
@@ -17,6 +18,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     checkAuth();
+    // Listener de sesión para OAuth (Google, etc)
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        checkAuth();
+      }
+    });
+    return () => {
+      listener?.subscription.unsubscribe();
+    };
   }, [checkAuth]);
 
   return (

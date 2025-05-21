@@ -3,6 +3,7 @@ import { Image, Video, FileAudio, FileText, Mic, Send } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { PostType, usePostStore } from '../../store/postStore';
 import { toast } from 'sonner';
+import { supabase } from '../../lib/supabase';
 
 interface CreatePostFormProps {
   onSuccess?: () => void;
@@ -13,38 +14,41 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const [mediaUrl, setMediaUrl] = useState('');
   const [postType, setPostType] = useState<PostType>('text');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+
   const { user } = useAuthStore();
   const { addPost } = usePostStore();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!user) {
       toast.error('You must be logged in to create a post');
       return;
     }
-    
+
     if (!content.trim() && !mediaUrl) {
       toast.error('Please add some content to your post');
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
       await addPost({
         userId: user.id,
         type: postType,
         content: content.trim(),
-        mediaUrl: mediaUrl || undefined
+        mediaUrl: mediaUrl || undefined,
+        isFavorite: false // requerido por el tipo Post
       });
-      
+
       // Reset form
       setContent('');
       setMediaUrl('');
       setPostType('text');
-      
+
       if (onSuccess) {
         onSuccess();
       }
@@ -54,25 +58,65 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
       setIsSubmitting(false);
     }
   };
-  
-  const handleMediaTypeChange = (type: PostType) => {
+
+  // Subir archivo a Supabase Storage
+  const uploadFile = async (file: File, folder: string) => {
+    const ext = file.name.split('.').pop();
+    const filePath = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+    const { error } = await supabase.storage.from('media').upload(filePath, file);
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
+    return urlData.publicUrl;
+  };
+
+  // Subir blob de audio
+  const uploadAudioBlob = async (blob: Blob) => {
+    const filePath = `audio/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.webm`;
+    const { error } = await supabase.storage.from('media').upload(filePath, blob);
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
+    return urlData.publicUrl;
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: PostType) => {
+    const selectedFile = e.target.files?.[0];
+    if (!selectedFile) return;
     setPostType(type);
-    
-    // In a real app, here we'd show a media picker UI
-    // For demo purposes, we'll use placeholder images based on type
-    if (type === 'image') {
-      setMediaUrl('https://images.pexels.com/photos/3617457/pexels-photo-3617457.jpeg?auto=compress&cs=tinysrgb&w=600');
-    } else if (type === 'video') {
-      setMediaUrl('https://images.pexels.com/photos/3759099/pexels-photo-3759099.jpeg?auto=compress&cs=tinysrgb&w=600');
-    } else if (type === 'audio') {
-      setMediaUrl('');
-    } else if (type === 'document') {
-      setMediaUrl('');
-    } else {
-      setMediaUrl('');
+    try {
+      const url = await uploadFile(selectedFile, type);
+      setMediaUrl(url);
+      toast.success('Archivo subido correctamente');
+    } catch (err) {
+      toast.error('Error al subir archivo');
     }
   };
-  
+
+  // Grabación de voz
+  const handleStartRecording = async () => {
+    setIsRecording(true);
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    setMediaRecorder(recorder);
+    const chunks: BlobPart[] = [];
+    recorder.ondataavailable = (e) => chunks.push(e.data);
+    recorder.onstop = async () => {
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      try {
+        const url = await uploadAudioBlob(blob);
+        setMediaUrl(url);
+        toast.success('Nota de voz subida');
+      } catch {
+        toast.error('Error al subir nota de voz');
+      }
+    };
+    recorder.start();
+  };
+
+  const handleStopRecording = () => {
+    setIsRecording(false);
+    mediaRecorder?.stop();
+  };
+
   return (
     <div className="feed-item mb-4">
       <form onSubmit={handleSubmit}>
@@ -103,7 +147,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
                   />
                   <button
                     type="button"
-                    onClick={() => setMediaUrl('')}
+                    onClick={() => { setMediaUrl(''); }}
                     className="absolute top-2 right-2 bg-gray-900/70 text-white p-1 rounded-full"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -112,44 +156,55 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
                   </button>
                 </div>
               )}
+              {mediaUrl && postType === 'video' && (
+                <div className="mt-2">
+                  <video src={mediaUrl} controls className="w-full max-h-[300px] rounded-lg" />
+                </div>
+              )}
+              {mediaUrl && postType === 'audio' && (
+                <div className="mt-2">
+                  <audio src={mediaUrl} controls className="w-full" />
+                </div>
+              )}
+              {mediaUrl && postType === 'document' && (
+                <div className="mt-2">
+                  <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Ver documento</a>
+                </div>
+              )}
             </div>
           </div>
         </div>
         
         <div className="px-4 py-3 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
           <div className="flex items-center space-x-4">
-            <button 
-              type="button" 
-              onClick={() => handleMediaTypeChange('image')}
-              className={`p-2 rounded-full ${postType === 'image' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}
-            >
-              <Image className="h-5 w-5" />
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handleMediaTypeChange('video')}
-              className={`p-2 rounded-full ${postType === 'video' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}
-            >
-              <Video className="h-5 w-5" />
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handleMediaTypeChange('audio')}
-              className={`p-2 rounded-full ${postType === 'audio' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}
-            >
-              <FileAudio className="h-5 w-5" />
-            </button>
-            <button 
-              type="button" 
-              onClick={() => handleMediaTypeChange('document')}
-              className={`p-2 rounded-full ${postType === 'document' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}
-            >
-              <FileText className="h-5 w-5" />
-            </button>
-            <button 
-              type="button" 
-              onClick={() => toast.info('Voice recording feature coming soon!')}
-              className="p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+            <label>
+              <input type="file" accept="image/*" hidden onChange={e => handleFileChange(e, 'image')} />
+              <button type="button" className={`p-2 rounded-full ${postType === 'image' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}>
+                <Image className="h-5 w-5" />
+              </button>
+            </label>
+            <label>
+              <input type="file" accept="video/*" hidden onChange={e => handleFileChange(e, 'video')} />
+              <button type="button" className={`p-2 rounded-full ${postType === 'video' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}>
+                <Video className="h-5 w-5" />
+              </button>
+            </label>
+            <label>
+              <input type="file" accept="audio/*" hidden onChange={e => handleFileChange(e, 'audio')} />
+              <button type="button" className={`p-2 rounded-full ${postType === 'audio' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}>
+                <FileAudio className="h-5 w-5" />
+              </button>
+            </label>
+            <label>
+              <input type="file" accept=".pdf,.doc,.docx,.txt,.odt" hidden onChange={e => handleFileChange(e, 'document')} />
+              <button type="button" className={`p-2 rounded-full ${postType === 'document' ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}>
+                <FileText className="h-5 w-5" />
+              </button>
+            </label>
+            <button
+              type="button"
+              className={`p-2 rounded-full ${postType === 'audio' && isRecording ? 'bg-red-200 text-red-600' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}
+              onClick={isRecording ? handleStopRecording : handleStartRecording}
             >
               <Mic className="h-5 w-5" />
             </button>

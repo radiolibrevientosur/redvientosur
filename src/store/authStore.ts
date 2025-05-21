@@ -19,6 +19,7 @@ interface AuthState {
   register: (email: string, password: string, username: string, displayName: string) => Promise<void>;
   logout: () => void;
   checkAuth: () => void;
+  loginWithGoogle: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -80,6 +81,20 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
   
+  loginWithGoogle: async () => {
+    set({ isLoading: true });
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      if (error) throw error;
+      // La redirección la maneja Supabase automáticamente
+      set({ isLoading: false });
+    } catch (error) {
+      set({ isAuthenticated: false, user: null, isLoading: false });
+      toast.error(error instanceof Error ? error.message : 'Error al iniciar sesión con Google');
+      throw error;
+    }
+  },
+
   logout: () => {
     localStorage.removeItem('user');
     set({ isAuthenticated: false, user: null });

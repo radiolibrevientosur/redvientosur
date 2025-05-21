@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { supabase } from '../lib/supabase';
 
-// Types
 export type PostType = 'text' | 'image' | 'video' | 'audio' | 'document';
 
 export interface Post {
@@ -32,83 +31,11 @@ interface PostState {
   
   fetchPosts: () => Promise<void>;
   addPost: (post: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments'>) => Promise<void>;
-  toggleLike: (postId: string, userId: string) => void;
-  addComment: (postId: string, userId: string, content: string) => void;
-  toggleFavorite: (postId: string) => void;
+  toggleLike: (postId: string, userId: string) => Promise<void>;
+  addComment: (postId: string, userId: string, content: string) => Promise<void>;
+  toggleFavorite: (postId: string) => Promise<void>;
   getFavoritePosts: () => Post[];
 }
-
-// Mock user data for posts
-const MOCK_USERS = [
-  {
-    id: '1',
-    username: 'johndoe',
-    displayName: 'John Doe',
-    avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100'
-  },
-  {
-    id: '2',
-    username: 'janedoe',
-    displayName: 'Jane Doe',
-    avatar: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=100'
-  },
-  {
-    id: '3',
-    username: 'marksmith',
-    displayName: 'Mark Smith',
-    avatar: 'https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=100'
-  }
-];
-
-// Sample posts for the demo
-const INITIAL_POSTS: Post[] = [
-  {
-    id: '1',
-    userId: '2',
-    type: 'image',
-    content: 'Enjoying a beautiful day at the art gallery! #art #inspiration',
-    mediaUrl: 'https://images.pexels.com/photos/3004909/pexels-photo-3004909.jpeg?auto=compress&cs=tinysrgb&w=600',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-    likes: ['3'],
-    comments: [
-      {
-        id: '101',
-        userId: '3',
-        content: 'Looks amazing! Which gallery is this?',
-        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString() // 30 minutes ago
-      }
-    ],
-    isFavorite: false
-  },
-  {
-    id: '2',
-    userId: '3',
-    type: 'text',
-    content: 'Just released a new album! So excited to share this journey with all of you. Link in bio to listen now. #music #newrelease',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(), // 5 hours ago
-    likes: ['1', '2'],
-    comments: [],
-    isFavorite: true
-  },
-  {
-    id: '3',
-    userId: '1',
-    type: 'image',
-    content: 'Working on a new painting technique. What do you think? #art #workinprogress',
-    mediaUrl: 'https://images.pexels.com/photos/1266808/pexels-photo-1266808.jpeg?auto=compress&cs=tinysrgb&w=600',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(), // 8 hours ago
-    likes: [],
-    comments: [
-      {
-        id: '102',
-        userId: '2',
-        content: 'Love the colors! What materials are you using?',
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 7).toISOString() // 7 hours ago
-      }
-    ],
-    isFavorite: false
-  }
-];
 
 export const usePostStore = create<PostState>((set, get) => ({
   posts: [],
@@ -118,33 +45,50 @@ export const usePostStore = create<PostState>((set, get) => ({
   fetchPosts: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { data, error } = await supabase
+      const { data: posts, error } = await supabase
         .from('publicaciones')
-        .select(`*, autor:usuarios(*), comentarios(*), reacciones(*)`)
+        .select(`
+          *,
+          autor:usuarios(*),
+          comentarios(*),
+          reacciones(*)
+        `)
         .order('creado_en', { ascending: false });
+
       if (error) throw error;
-      // Mapear los datos de Supabase al tipo Post
-      const posts: Post[] = (data || []).map((p: any) => ({
-        id: p.id,
-        userId: p.autor_id || '',
-        type: p.tipo as PostType,
-        content: p.contenido || '',
-        mediaUrl: Array.isArray(p.multimedia_url) ? p.multimedia_url[0] : undefined,
-        createdAt: p.creado_en || '',
-        likes: (p.reacciones || []).map((r: any) => r.usuario_id),
-        comments: (p.comentarios || []).map((c: any) => ({
-          id: c.id,
-          userId: c.usuario_id,
-          content: c.contenido,
-          createdAt: c.creado_en
-        })),
-        isFavorite: false // Puedes ajustar esto según tu lógica de favoritos
+
+      // Transform data to match Post interface
+      const transformedPosts: Post[] = await Promise.all(posts.map(async (post) => {
+        // Check if post is favorited by current user
+        const { data: favorite } = await supabase
+          .from('favoritos')
+          .select('*')
+          .eq('publicacion_id', post.id)
+          .single();
+
+        return {
+          id: post.id,
+          userId: post.autor_id,
+          type: post.tipo,
+          content: post.contenido,
+          mediaUrl: post.multimedia_url?.[0],
+          createdAt: post.creado_en,
+          likes: post.reacciones.map((r: any) => r.usuario_id),
+          comments: post.comentarios.map((c: any) => ({
+            id: c.id,
+            userId: c.autor_id,
+            content: c.contenido,
+            createdAt: c.creado_en
+          })),
+          isFavorite: !!favorite
+        };
       }));
-      set({ posts, isLoading: false });
+
+      set({ posts: transformedPosts, isLoading: false });
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to fetch posts',
-        isLoading: false
+      set({ 
+        error: error instanceof Error ? error.message : 'Error al cargar publicaciones', 
+        isLoading: false 
       });
     }
   },
@@ -152,22 +96,36 @@ export const usePostStore = create<PostState>((set, get) => ({
   addPost: async (post) => {
     set({ isLoading: true, error: null });
     try {
-      // Insertar post real en Supabase
-      const { error } = await supabase.from('publicaciones').insert([
-        {
+      const { data, error } = await supabase
+        .from('publicaciones')
+        .insert({
           autor_id: post.userId,
-          titulo: post.content.substring(0, 60) || 'Sin título',
-          contenido: post.content,
-          excerpt: post.content.substring(0, 120),
-          imagen_portada: post.mediaUrl,
-          categoria: 'General', // Puedes ajustar esto según tu UI
           tipo: post.type,
-          publicado_en: new Date().toISOString(),
-          actualizado_en: new Date().toISOString()
-        }
-      ]);
+          contenido: post.content,
+          multimedia_url: post.mediaUrl ? [post.mediaUrl] : []
+        })
+        .select()
+        .single();
+
       if (error) throw error;
-      await get().fetchPosts();
+
+      const newPost: Post = {
+        id: data.id,
+        userId: data.autor_id,
+        type: data.tipo,
+        content: data.contenido,
+        mediaUrl: data.multimedia_url?.[0],
+        createdAt: data.creado_en,
+        likes: [],
+        comments: [],
+        isFavorite: false
+      };
+      
+      set(state => ({ 
+        posts: [newPost, ...state.posts],
+        isLoading: false 
+      }));
+      
       toast.success('¡Publicación creada exitosamente!');
     } catch (error) {
       set({ 
@@ -178,66 +136,128 @@ export const usePostStore = create<PostState>((set, get) => ({
     }
   },
   
-  toggleLike: (postId, userId) => {
-    set(state => {
-      const updatedPosts = state.posts.map(post => {
-        if (post.id === postId) {
-          const isLiked = post.likes.includes(userId);
-          return {
-            ...post,
-            likes: isLiked
-              ? post.likes.filter(id => id !== userId)
-              : [...post.likes, userId]
-          };
-        }
-        return post;
-      });
-      
-      return { posts: updatedPosts };
-    });
+  toggleLike: async (postId, userId) => {
+    try {
+      const post = get().posts.find(p => p.id === postId);
+      if (!post) return;
+
+      const isLiked = post.likes.includes(userId);
+
+      if (isLiked) {
+        // Remove like
+        const { error } = await supabase
+          .from('reacciones')
+          .delete()
+          .eq('publicacion_id', postId)
+          .eq('usuario_id', userId);
+
+        if (error) throw error;
+      } else {
+        // Add like
+        const { error } = await supabase
+          .from('reacciones')
+          .insert({
+            publicacion_id: postId,
+            usuario_id: userId,
+            tipo: 'like'
+          });
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      set(state => ({
+        posts: state.posts.map(p => 
+          p.id === postId
+            ? {
+                ...p,
+                likes: isLiked
+                  ? p.likes.filter(id => id !== userId)
+                  : [...p.likes, userId]
+              }
+            : p
+        )
+      }));
+    } catch (error) {
+      toast.error('Error al actualizar reacción');
+    }
   },
   
-  addComment: (postId, userId, content) => {
-    if (!content.trim()) return;
-    
-    set(state => {
-      const updatedPosts = state.posts.map(post => {
-        if (post.id === postId) {
-          const newComment: Comment = {
-            id: Math.random().toString(36).substring(2, 9),
-            userId,
-            content,
-            createdAt: new Date().toISOString()
-          };
-          
-          return {
-            ...post,
-            comments: [...post.comments, newComment]
-          };
-        }
-        return post;
-      });
+  addComment: async (postId, userId, content) => {
+    try {
+      const { data, error } = await supabase
+        .from('comentarios')
+        .insert({
+          publicacion_id: postId,
+          autor_id: userId,
+          contenido: content
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newComment: Comment = {
+        id: data.id,
+        userId: data.autor_id,
+        content: data.contenido,
+        createdAt: data.creado_en
+      };
+
+      set(state => ({
+        posts: state.posts.map(post =>
+          post.id === postId
+            ? { ...post, comments: [...post.comments, newComment] }
+            : post
+        )
+      }));
       
-      return { posts: updatedPosts };
-    });
-    
-    toast.success('Comment added');
+      toast.success('Comentario agregado');
+    } catch (error) {
+      toast.error('Error al agregar comentario');
+    }
   },
   
-  toggleFavorite: (postId) => {
-    set(state => {
-      const updatedPosts = state.posts.map(post => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            isFavorite: !post.isFavorite
-          };
-        }
-        return post;
-      });
-      
-      return { posts: updatedPosts };
-    });
+  toggleFavorite: async (postId) => {
+    try {
+      const post = get().posts.find(p => p.id === postId);
+      if (!post) return;
+
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      if (post.isFavorite) {
+        // Remove from favorites
+        const { error } = await supabase
+          .from('favoritos')
+          .delete()
+          .eq('publicacion_id', postId)
+          .eq('usuario_id', session.user.id);
+
+        if (error) throw error;
+      } else {
+        // Add to favorites
+        const { error } = await supabase
+          .from('favoritos')
+          .insert({
+            publicacion_id: postId,
+            usuario_id: session.user.id
+          });
+
+        if (error) throw error;
+      }
+
+      // Update local state
+      set(state => ({
+        posts: state.posts.map(p =>
+          p.id === postId
+            ? { ...p, isFavorite: !p.isFavorite }
+            : p
+        )
+      }));
+    } catch (error) {
+      toast.error('Error al actualizar favoritos');
+    }
   },
   
   getFavoritePosts: () => {
@@ -246,8 +266,21 @@ export const usePostStore = create<PostState>((set, get) => ({
 }));
 
 // Helper function to get user by ID
-export const getUserById = (userId: string) => {
-  return MOCK_USERS.find(user => user.id === userId);
+export const getUserById = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error) return null;
+
+  return {
+    id: data.id,
+    username: data.nombre_usuario,
+    displayName: data.nombre_completo,
+    avatar: data.avatar_url
+  };
 };
 
 // Helper function to format post date

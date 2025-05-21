@@ -22,36 +22,27 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!user) {
       toast.error('You must be logged in to create a post');
       return;
     }
-
     if (!content.trim() && !mediaUrl) {
       toast.error('Please add some content to your post');
       return;
     }
-
     setIsSubmitting(true);
-
     try {
       await addPost({
         userId: user.id,
         type: postType,
         content: content.trim(),
         mediaUrl: mediaUrl || undefined,
-        isFavorite: false // requerido por el tipo Post
+        isFavorite: false
       });
-
-      // Reset form
       setContent('');
       setMediaUrl('');
       setPostType('text');
-
-      if (onSuccess) {
-        onSuccess();
-      }
+      if (onSuccess) onSuccess();
     } catch (error) {
       console.error('Failed to create post:', error);
     } finally {
@@ -104,6 +95,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
       try {
         const url = await uploadAudioBlob(blob);
         setMediaUrl(url);
+        setPostType('audio');
         toast.success('Nota de voz subida');
       } catch {
         toast.error('Error al subir nota de voz');
@@ -137,7 +129,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
                 className="w-full p-2 text-gray-900 dark:text-white bg-transparent border-none focus:ring-0 resize-none"
                 rows={3}
               />
-              
               {mediaUrl && postType === 'image' && (
                 <div className="mt-2 relative rounded-lg overflow-hidden">
                   <img 
@@ -174,7 +165,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
             </div>
           </div>
         </div>
-        
         <div className="px-4 py-3 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
           <div className="flex items-center space-x-4">
             <label>
@@ -209,7 +199,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               <Mic className="h-5 w-5" />
             </button>
           </div>
-          
           <button 
             type="submit"
             disabled={isSubmitting || (!content.trim() && !mediaUrl)}

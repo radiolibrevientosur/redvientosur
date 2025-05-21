@@ -10,8 +10,8 @@ export interface Event {
   title: string;
   description: string;
   type: EventType;
-  date: string; // ISO string
-  time?: string; // HH:MM format
+  date: string;
+  time?: string;
   location?: string;
   userId: string;
   createdAt: string;
@@ -29,40 +29,6 @@ interface EventState {
   getEventsByDate: (date: Date) => Event[];
 }
 
-// Sample events for the demo
-const today = startOfToday();
-const INITIAL_EVENTS: Event[] = [
-  {
-    id: '1',
-    title: 'Art Exhibition Opening',
-    description: 'New contemporary art exhibition opening',
-    type: 'event',
-    date: today.toISOString(),
-    time: '18:00',
-    location: 'City Art Gallery',
-    userId: '1',
-    createdAt: addDays(today, -5).toISOString()
-  },
-  {
-    id: '2',
-    title: 'Finalize project proposal',
-    description: 'Complete and submit the creative project proposal',
-    type: 'task',
-    date: addDays(today, 2).toISOString(),
-    userId: '1',
-    createdAt: addDays(today, -2).toISOString()
-  },
-  {
-    id: '3',
-    title: 'Sarah\'s Birthday',
-    description: 'Don\'t forget to call and send a gift',
-    type: 'birthday',
-    date: addDays(today, 5).toISOString(),
-    userId: '1',
-    createdAt: addDays(today, -10).toISOString()
-  }
-];
-
 export const useEventStore = create<EventState>((set, get) => ({
   events: [],
   isLoading: false,
@@ -71,27 +37,30 @@ export const useEventStore = create<EventState>((set, get) => ({
   fetchEvents: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { data, error } = await supabase
+      const { data: events, error } = await supabase
         .from('eventos')
         .select('*')
-        .order('creado_en', { ascending: false });
+        .order('fecha_inicio', { ascending: true });
+
       if (error) throw error;
-      const events: Event[] = (data || []).map((e: any) => ({
-        id: e.id,
-        title: e.titulo,
-        description: e.descripcion,
-        type: e.tipo,
-        date: e.fecha,
-        time: e.hora,
-        location: e.ubicacion,
-        userId: e.usuario_id,
-        createdAt: e.creado_en
+
+      const transformedEvents: Event[] = events.map(event => ({
+        id: event.id,
+        title: event.titulo,
+        description: event.descripcion || '',
+        type: event.tipo as EventType,
+        date: event.fecha_inicio,
+        time: format(new Date(event.fecha_inicio), 'HH:mm'),
+        location: event.ubicacion,
+        userId: event.creador_id,
+        createdAt: event.creado_en
       }));
-      set({ events, isLoading: false });
+
+      set({ events: transformedEvents, isLoading: false });
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to fetch events',
-        isLoading: false
+      set({ 
+        error: error instanceof Error ? error.message : 'Error al cargar eventos', 
+        isLoading: false 
       });
     }
   },
@@ -99,75 +68,119 @@ export const useEventStore = create<EventState>((set, get) => ({
   addEvent: async (event) => {
     set({ isLoading: true, error: null });
     try {
-      const { error } = await supabase.from('eventos').insert([
-        {
+      const eventDate = new Date(event.date);
+      if (event.time) {
+        const [hours, minutes] = event.time.split(':');
+        eventDate.setHours(parseInt(hours), parseInt(minutes));
+      }
+
+      const { data, error } = await supabase
+        .from('eventos')
+        .insert({
           titulo: event.title,
           descripcion: event.description,
           tipo: event.type,
-          fecha_inicio: event.date, // date es ISO string
-          hora: event.time, // si existe el campo en la tabla, si no, omitir
+          fecha_inicio: eventDate.toISOString(),
           ubicacion: event.location,
-          creador_id: event.userId
-        }
-      ]);
+          creador_id: event.userId,
+          estado: 'publicado'
+        })
+        .select()
+        .single();
+
       if (error) throw error;
-      await get().fetchEvents();
-      toast.success('Evento creado exitosamente!');
+
+      const newEvent: Event = {
+        id: data.id,
+        title: data.titulo,
+        description: data.descripcion || '',
+        type: data.tipo,
+        date: data.fecha_inicio,
+        time: event.time,
+        location: data.ubicacion,
+        userId: data.creador_id,
+        createdAt: data.creado_en
+      };
+      
+      set(state => ({ 
+        events: [...state.events, newEvent],
+        isLoading: false 
+      }));
+      
+      toast.success('¡Evento creado exitosamente!');
     } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to create event',
-        isLoading: false
+      set({ 
+        error: error instanceof Error ? error.message : 'Error al crear evento', 
+        isLoading: false 
       });
-      toast.error('Failed to create event');
+      toast.error('Error al crear evento');
     }
   },
   
   updateEvent: async (id, eventData) => {
     set({ isLoading: true, error: null });
     try {
-      // Actualizar evento en Supabase
+      const updateData: any = {};
+      
+      if (eventData.title) updateData.titulo = eventData.title;
+      if (eventData.description) updateData.descripcion = eventData.description;
+      if (eventData.type) updateData.tipo = eventData.type;
+      if (eventData.date) {
+        const eventDate = new Date(eventData.date);
+        if (eventData.time) {
+          const [hours, minutes] = eventData.time.split(':');
+          eventDate.setHours(parseInt(hours), parseInt(minutes));
+        }
+        updateData.fecha_inicio = eventDate.toISOString();
+      }
+      if (eventData.location) updateData.ubicacion = eventData.location;
+
       const { error } = await supabase
         .from('eventos')
-        .update({
-          titulo: eventData.title,
-          descripcion: eventData.description,
-          tipo: eventData.type,
-          fecha_inicio: eventData.date,
-          hora: eventData.time,
-          ubicacion: eventData.location
-        })
+        .update(updateData)
         .eq('id', id);
+
       if (error) throw error;
-      await get().fetchEvents();
-      set({ isLoading: false });
-      toast.success('Evento actualizado exitosamente!');
+
+      set(state => ({
+        events: state.events.map(event =>
+          event.id === id ? { ...event, ...eventData } : event
+        ),
+        isLoading: false
+      }));
+      
+      toast.success('¡Evento actualizado exitosamente!');
     } catch (error) {
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to update event', 
+        error: error instanceof Error ? error.message : 'Error al actualizar evento', 
         isLoading: false 
       });
-      toast.error('Error al actualizar el evento');
+      toast.error('Error al actualizar evento');
     }
   },
   
   deleteEvent: async (id) => {
     set({ isLoading: true, error: null });
     try {
-      // Eliminar evento en Supabase
       const { error } = await supabase
         .from('eventos')
         .delete()
         .eq('id', id);
+
       if (error) throw error;
-      await get().fetchEvents();
-      set({ isLoading: false });
-      toast.success('Evento eliminado exitosamente!');
+      
+      set(state => ({
+        events: state.events.filter(event => event.id !== id),
+        isLoading: false
+      }));
+      
+      toast.success('¡Evento eliminado exitosamente!');
     } catch (error) {
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to delete event', 
+        error: error instanceof Error ? error.message : 'Error al eliminar evento', 
         isLoading: false 
       });
-      toast.error('Error al eliminar el evento');
+      toast.error('Error al eliminar evento');
     }
   },
   

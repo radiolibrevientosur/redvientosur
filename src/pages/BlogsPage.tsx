@@ -1,44 +1,95 @@
 import React, { useEffect, useState } from 'react';
-import { Book, Heart, MessageCircle, User, Calendar, ArrowRight } from 'lucide-react';
+import { Book, Heart, MessageCircle, BookmarkCheck, User, Calendar, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
+interface BlogPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  coverImage: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar: string;
+  published: string;
+  category: string;
+  readTime: number;
+  likes: number;
+  comments: number;
+}
+
+const sampleBlogs: BlogPost[] = [
+  {
+    id: '1',
+    title: 'El arte contemporáneo en Latinoamérica',
+    excerpt: 'Un análisis de las tendencias actuales y su impacto en la sociedad...',
+    coverImage: 'https://images.pexels.com/photos/1749/fire-orange-emergency-burning.jpg?auto=compress&cs=tinysrgb&w=600',
+    authorId: '1',
+    authorName: 'María González',
+    authorAvatar: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=100',
+    published: '2025-03-15T10:00:00Z',
+    category: 'Arte',
+    readTime: 8,
+    likes: 42,
+    comments: 7
+  },
+  {
+    id: '2',
+    title: 'Música tradicional: Preservación y evolución',
+    excerpt: 'Explorando cómo las raíces musicales se mantienen relevantes en la era digital...',
+    coverImage: 'https://images.pexels.com/photos/995301/pexels-photo-995301.jpeg?auto=compress&cs=tinysrgb&w=600',
+    authorId: '2',
+    authorName: 'Carlos Moreno',
+    authorAvatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100',
+    published: '2025-03-10T14:30:00Z',
+    category: 'Música',
+    readTime: 6,
+    likes: 38,
+    comments: 12
+  },
+  {
+    id: '3',
+    title: 'El cine independiente: Voces emergentes',
+    excerpt: 'Nuevos directores y perspectivas que están transformando la narrativa visual...',
+    coverImage: 'https://images.pexels.com/photos/2873486/pexels-photo-2873486.jpeg?auto=compress&cs=tinysrgb&w=600',
+    authorId: '3',
+    authorName: 'Laura Díaz',
+    authorAvatar: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=100',
+    published: '2025-03-05T09:15:00Z',
+    category: 'Cine',
+    readTime: 10,
+    likes: 56,
+    comments: 8
+  }
+];
+
 const BlogsPage: React.FC = () => {
+  const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('Todos');
-  const { posts, fetchPosts, isLoading: postsLoading } = require('../store/postStore').usePostStore();
-
+  
   useEffect(() => {
-    fetchPosts().finally(() => setIsLoading(false));
-  }, [fetchPosts]);
-
+    // Simular carga de blogs
+    const loadBlogs = async () => {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setBlogs(sampleBlogs);
+      setIsLoading(false);
+    };
+    
+    loadBlogs();
+  }, []);
+  
   const categories = ['Todos', 'Arte', 'Música', 'Cine', 'Danza', 'Literatura'];
-
-  if (isLoading || postsLoading) {
+  
+  if (isLoading) {
     return (
       <div className="py-8 flex justify-center">
         <LoadingSpinner message="Cargando artículos..." />
       </div>
     );
   }
-
-  // Mapear los posts reales a la estructura esperada
-  const blogs = posts.map((p: any) => ({
-    id: p.id,
-    title: p.content.substring(0, 60) || 'Sin título',
-    excerpt: p.content.substring(0, 120),
-    coverImage: p.mediaUrl || 'https://images.pexels.com/photos/1749/fire-orange-emergency-burning.jpg?auto=compress&cs=tinysrgb&w=600',
-    authorId: p.userId,
-    authorName: p.userId, // Puedes mapear a nombre real si tienes relación
-    authorAvatar: '', // Puedes mapear a avatar real si tienes relación
-    published: p.createdAt,
-    category: 'General', // Ajusta si tienes categoría real
-    readTime: 5, // Calcula si tienes campo real
-    likes: p.likes.length,
-    comments: p.comments.length
-  }));
-
+  
   return (
     <div className="space-y-6">
       {/* Featured Blog */}
@@ -81,8 +132,8 @@ const BlogsPage: React.FC = () => {
       {/* Blog List */}
       <div className="space-y-4">
         {blogs
-          .filter((blog: any) => activeCategory === 'Todos' || blog.category === activeCategory)
-          .map((blog: any) => (
+          .filter(blog => activeCategory === 'Todos' || blog.category === activeCategory)
+          .map(blog => (
             <Link key={blog.id} to={`/blogs/${blog.id}`}>
               <motion.div 
                 className="card p-0 overflow-hidden"

@@ -19,9 +19,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     checkAuth();
     // Listener de sesión para OAuth (Google, etc)
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        checkAuth();
+        await checkAuth();
       }
     });
     return () => {

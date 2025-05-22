@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ImageUpload } from '../ui/ImageUpload';
-import { CalendarDays, Users, Tags, FileText, Phone, AtSign, DollarSign, RefreshCw, HelpCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
@@ -57,17 +56,47 @@ const eventSchema = z.object({
   recurrence: recurrenceSchema.default({ type: 'none' })
 });
 
+type EventSchema = z.infer<typeof eventSchema>;
+
 interface CreateEventFormProps {
   date: Date;
   onSuccess: () => void;
   onCancel: () => void;
 }
 
+interface EventData {
+  creador_id: string;
+  titulo: string;
+  descripcion: string;
+  tipo: string;
+  categoria: string;
+  fecha_inicio: string;
+  ubicacion: string;
+  imagen_url?: string;
+  estado: string;
+  precio: number;
+  metadata: {
+    target_audience: string;
+    responsible_person: {
+      name: string;
+      phone: string;
+      social_media?: string;
+    };
+    technical_requirements: string[];
+    tags: string[];
+    recurrence: {
+      type: string;
+      interval?: number;
+      end_date?: string;
+      days_of_week?: number[];
+    };
+  };
+}
+
 const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCancel }) => {
-  const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[number] | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<z.infer<typeof eventSchema>>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<EventSchema>({
     resolver: zodResolver(eventSchema),
     defaultValues: {
       date: date.toISOString().split('T')[0],
@@ -78,20 +107,18 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
     }
   });
 
-  const costType = watch('cost.type');
-  const recurrenceType = watch('recurrence.type');
   const category = watch('category');
+  const costType = watch('cost.type');
 
   const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newCategory = e.target.value as typeof CATEGORIES[number];
-    setSelectedCategory(newCategory);
     setValue('category', newCategory);
     setValue('event_type', '');
   };
 
-  const uploadImage = async (file: File) => {
+  const uploadImage = async (file: File): Promise<string | null> => {
     const fileName = `events/${Date.now()}_${file.name}`;
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('event_images')
       .upload(fileName, file);
 
@@ -107,46 +134,6 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
     return urlData.publicUrl;
   };
 
-  const onSubmit = async (formData: z.infer<typeof eventSchema>) => {
-    setIsSubmitting(true);
-    try {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-
-      const { error: eventError } = await supabase
-        .from('eventos')
-        .insert({
-          creador_id: userData.user.id,
-          titulo: formData.title,
-          descripcion: formData.description,
-          tipo: formData.event_type,
-          categoria: formData.category,
-          fecha_inicio: new Date(formData.date).toISOString(),
-          ubicacion: formData.location,
-          imagen_url: formData.image_url,
-          estado: 'publicado',
-          precio: formData.cost.type === 'paid' ? formData.cost.amount : 0,
-          metadata: {
-            target_audience: formData.target_audience,
-            responsible_person: formData.responsible_person,
-            technical_requirements: formData.technical_requirements,
-            tags: formData.tags,
-            recurrence: formData.recurrence
-          }
-        });
-
-      if (eventError) throw eventError;
-
-      toast.success('Evento creado exitosamente');
-      onSuccess();
-    } catch (error) {
-      console.error('Error al crear evento:', error);
-      toast.error('Error al crear el evento');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleImageChange = async (file: File | undefined) => {
     if (!file) {
       setValue('image_url', undefined);
@@ -155,6 +142,78 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
     
     const imageUrl = await uploadImage(file);
     if (imageUrl) setValue('image_url', imageUrl);
+  };
+
+  const onSubmit = async (formData: EventSchema) => {
+    setIsSubmitting(true);
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('Error de autenticación:', userError);
+        toast.error('Error de autenticación. Por favor, inicia sesión nuevamente.');
+        return;
+      }
+      
+      if (!userData.user) {
+        toast.error('Debes iniciar sesión para crear un evento');
+        return;
+      }
+
+      const eventData: EventData = {
+        creador_id: userData.user.id,
+        titulo: formData.title,
+        descripcion: formData.description,
+        tipo: formData.event_type,
+        categoria: formData.category,
+        fecha_inicio: new Date(formData.date).toISOString(),
+        ubicacion: formData.location,
+        imagen_url: formData.image_url,
+        estado: 'publicado',
+        precio: formData.cost.type === 'paid' ? formData.cost.amount || 0 : 0,
+        metadata: {
+          target_audience: formData.target_audience,
+          responsible_person: formData.responsible_person,
+          technical_requirements: formData.technical_requirements,
+          tags: formData.tags,
+          recurrence: formData.recurrence
+        }
+      };
+
+      console.log('Enviando datos del evento:', eventData);
+
+      const { data, error: eventError } = await supabase
+        .from('eventos')
+        .insert(eventData)
+        .select()
+        .single();
+
+      if (eventError) {
+        console.error('Error al crear evento:', eventError);
+        if (eventError.code === 'PGRST116') {
+          toast.error('No tienes permisos para crear eventos.');
+        } else if (eventError.code === '23503') {
+          toast.error('Error con la referencia del usuario. Por favor, inicia sesión nuevamente.');
+        } else {
+          toast.error(`Error al crear el evento: ${eventError.message}`);
+        }
+        return;
+      }
+
+      if (!data) {
+        console.error('No se recibió confirmación del evento creado');
+        toast.error('Error al crear el evento: no se recibió confirmación');
+        return;
+      }
+
+      console.log('Evento creado exitosamente:', data);
+      toast.success('Evento creado exitosamente');
+      onSuccess();
+    } catch (error) {
+      console.error('Error detallado al crear evento:', error);
+      toast.error('Error al crear el evento');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -310,6 +369,9 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
                 {...register('responsible_person.name')}
                 className="input w-full"
               />
+              {errors.responsible_person?.name && (
+                <p className="text-red-500 text-sm mt-1">{errors.responsible_person.name.message}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Teléfono</label>
@@ -318,6 +380,9 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
                 {...register('responsible_person.phone')}
                 className="input w-full"
               />
+              {errors.responsible_person?.phone && (
+                <p className="text-red-500 text-sm mt-1">{errors.responsible_person.phone.message}</p>
+              )}
             </div>
           </div>
           <div>

@@ -16,6 +16,12 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [recordingTime, setRecordingTime] = useState<number>(0);
+  let recordingInterval: NodeJS.Timeout;
 
   const { user } = useAuthStore();
   const { addPost } = usePostStore();
@@ -23,11 +29,11 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      toast.error('You must be logged in to create a post');
+      toast.error('Debes iniciar sesión para crear una publicación');
       return;
     }
     if (!content.trim() && !mediaUrl) {
-      toast.error('Please add some content to your post');
+      toast.error('Por favor, agrega contenido o un archivo');
       return;
     }
     setIsSubmitting(true);
@@ -42,8 +48,10 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
       setContent('');
       setMediaUrl('');
       setPostType('text');
+      toast.success('¡Publicación creada exitosamente!');
       if (onSuccess) onSuccess();
     } catch (error) {
+      toast.error('Error al crear la publicación');
       console.error('Failed to create post:', error);
     } finally {
       setIsSubmitting(false);
@@ -52,9 +60,23 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
 
   // Subir archivo a Supabase Storage
   const uploadFile = async (file: File, folder: string) => {
+    setUploadProgress(0);
+    setPreviewUrl(URL.createObjectURL(file));
+    // Simulación de progreso (Supabase no da progreso nativo)
+    const fakeProgress = setInterval(() => {
+      setUploadProgress((p) => {
+        if (p >= 90) {
+          clearInterval(fakeProgress);
+          return p;
+        }
+        return p + 10;
+      });
+    }, 100);
     const ext = file.name.split('.').pop();
     const filePath = `${folder}/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
     const { error } = await supabase.storage.from('media').upload(filePath, file);
+    clearInterval(fakeProgress);
+    setUploadProgress(100);
     if (error) throw error;
     const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
     return urlData.publicUrl;
@@ -62,8 +84,21 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
 
   // Subir blob de audio
   const uploadAudioBlob = async (blob: Blob) => {
+    setUploadProgress(0);
+    setAudioPreviewUrl(URL.createObjectURL(blob));
+    const fakeProgress = setInterval(() => {
+      setUploadProgress((p) => {
+        if (p >= 90) {
+          clearInterval(fakeProgress);
+          return p;
+        }
+        return p + 10;
+      });
+    }, 100);
     const filePath = `audio/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.webm`;
     const { error } = await supabase.storage.from('media').upload(filePath, blob);
+    clearInterval(fakeProgress);
+    setUploadProgress(100);
     if (error) throw error;
     const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
     return urlData.publicUrl;
@@ -73,18 +108,23 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
     setPostType(type);
+    setPreviewUrl(URL.createObjectURL(selectedFile));
     try {
       const url = await uploadFile(selectedFile, type);
       setMediaUrl(url);
       toast.success('Archivo subido correctamente');
     } catch (err) {
       toast.error('Error al subir archivo');
+    } finally {
+      setUploadProgress(0);
     }
   };
 
-  // Grabación de voz
+  // Grabación de voz mejorada
   const handleStartRecording = async () => {
     setIsRecording(true);
+    setRecordingTime(0);
+    setAudioPreviewUrl(null);
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const recorder = new MediaRecorder(stream);
     setMediaRecorder(recorder);
@@ -92,21 +132,38 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     recorder.ondataavailable = (e) => chunks.push(e.data);
     recorder.onstop = async () => {
       const blob = new Blob(chunks, { type: 'audio/webm' });
-      try {
-        const url = await uploadAudioBlob(blob);
-        setMediaUrl(url);
-        setPostType('audio');
-        toast.success('Nota de voz subida');
-      } catch {
-        toast.error('Error al subir nota de voz');
-      }
+      setAudioBlob(blob);
+      setAudioPreviewUrl(URL.createObjectURL(blob));
+      setIsRecording(false);
+      clearInterval(recordingInterval);
     };
     recorder.start();
+    // Temporizador
+    recordingInterval = setInterval(() => {
+      setRecordingTime((t) => t + 1);
+    }, 1000);
   };
 
   const handleStopRecording = () => {
     setIsRecording(false);
     mediaRecorder?.stop();
+    clearInterval(recordingInterval);
+  };
+
+  const handleUploadRecordedAudio = async () => {
+    if (!audioBlob) return;
+    try {
+      const url = await uploadAudioBlob(audioBlob);
+      setMediaUrl(url);
+      setPostType('audio');
+      toast.success('Nota de voz subida');
+      setAudioBlob(null);
+      setAudioPreviewUrl(null);
+    } catch {
+      toast.error('Error al subir nota de voz');
+    } finally {
+      setUploadProgress(0);
+    }
   };
 
   return (
@@ -123,22 +180,30 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
             </div>
             <div className="flex-1">
               <textarea
-                placeholder="What's happening?"
+                placeholder="¿Qué está pasando?"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="w-full p-2 text-gray-900 dark:text-white bg-transparent border-none focus:ring-0 resize-none"
+                className={`w-full p-2 text-gray-900 dark:text-white bg-transparent border-none focus:ring-0 resize-none ${!content.trim() && isSubmitting ? 'border border-red-500' : ''}`}
                 rows={3}
+                aria-label="Contenido de la publicación"
+                required={!mediaUrl}
+                disabled={isSubmitting}
               />
-              {mediaUrl && postType === 'image' && (
+              {previewUrl && postType === 'image' && (
                 <div className="mt-2 relative rounded-lg overflow-hidden">
                   <img 
-                    src={mediaUrl} 
-                    alt="Post preview" 
+                    src={previewUrl} 
+                    alt="Previsualización" 
                     className="w-full h-auto max-h-[300px] object-cover rounded-lg"
                   />
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <div className="absolute bottom-0 left-0 right-0 h-2 bg-primary-100">
+                      <div className="h-2 bg-primary-600" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => { setMediaUrl(''); }}
+                    onClick={() => { setPreviewUrl(null); setMediaUrl(''); }}
                     className="absolute top-2 right-2 bg-gray-900/70 text-white p-1 rounded-full"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -150,6 +215,20 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               {mediaUrl && postType === 'video' && (
                 <div className="mt-2">
                   <video src={mediaUrl} controls className="w-full max-h-[300px] rounded-lg" />
+                </div>
+              )}
+              {audioPreviewUrl && postType === 'audio' && !isRecording && (
+                <div className="mt-2 flex flex-col items-start">
+                  <audio src={audioPreviewUrl} controls className="w-full" />
+                  <button type="button" onClick={handleUploadRecordedAudio} className="btn btn-primary mt-2">Subir nota de voz</button>
+                  <button type="button" onClick={() => { setAudioBlob(null); setAudioPreviewUrl(null); }} className="btn btn-secondary mt-2">Cancelar</button>
+                </div>
+              )}
+              {isRecording && (
+                <div className="mt-2 flex items-center space-x-2">
+                  <span className="text-red-600 font-bold">● Grabando</span>
+                  <span>{recordingTime}s</span>
+                  <button type="button" onClick={handleStopRecording} className="btn btn-danger ml-2">Detener</button>
                 </div>
               )}
               {mediaUrl && postType === 'audio' && (
@@ -202,14 +281,15 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
           <button 
             type="submit"
             disabled={isSubmitting || (!content.trim() && !mediaUrl)}
-            className="btn btn-primary py-1.5 px-4 rounded-full disabled:opacity-50"
+            className="btn btn-primary py-1.5 px-4 rounded-full disabled:opacity-50 flex items-center"
+            aria-busy={isSubmitting}
           >
             {isSubmitting ? (
               <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
             ) : (
               <Send className="h-4 w-4 mr-2" />
             )}
-            Post
+            {isSubmitting ? 'Publicando...' : 'Post'}
           </button>
         </div>
       </form>

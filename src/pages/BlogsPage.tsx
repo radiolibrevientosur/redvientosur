@@ -3,6 +3,7 @@ import { Book, Heart, MessageCircle, BookmarkCheck, User, Calendar, ArrowRight }
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 interface BlogPost {
   id: string;
@@ -14,74 +15,47 @@ interface BlogPost {
   authorAvatar: string;
   published: string;
   category: string;
-  readTime: number;
-  likes: number;
-  comments: number;
+  // Opcional: readTime, likes, comments
 }
-
-const sampleBlogs: BlogPost[] = [
-  {
-    id: '1',
-    title: 'El arte contemporáneo en Latinoamérica',
-    excerpt: 'Un análisis de las tendencias actuales y su impacto en la sociedad...',
-    coverImage: 'https://images.pexels.com/photos/1749/fire-orange-emergency-burning.jpg?auto=compress&cs=tinysrgb&w=600',
-    authorId: '1',
-    authorName: 'María González',
-    authorAvatar: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=100',
-    published: '2025-03-15T10:00:00Z',
-    category: 'Arte',
-    readTime: 8,
-    likes: 42,
-    comments: 7
-  },
-  {
-    id: '2',
-    title: 'Música tradicional: Preservación y evolución',
-    excerpt: 'Explorando cómo las raíces musicales se mantienen relevantes en la era digital...',
-    coverImage: 'https://images.pexels.com/photos/995301/pexels-photo-995301.jpeg?auto=compress&cs=tinysrgb&w=600',
-    authorId: '2',
-    authorName: 'Carlos Moreno',
-    authorAvatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=100',
-    published: '2025-03-10T14:30:00Z',
-    category: 'Música',
-    readTime: 6,
-    likes: 38,
-    comments: 12
-  },
-  {
-    id: '3',
-    title: 'El cine independiente: Voces emergentes',
-    excerpt: 'Nuevos directores y perspectivas que están transformando la narrativa visual...',
-    coverImage: 'https://images.pexels.com/photos/2873486/pexels-photo-2873486.jpeg?auto=compress&cs=tinysrgb&w=600',
-    authorId: '3',
-    authorName: 'Laura Díaz',
-    authorAvatar: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=100',
-    published: '2025-03-05T09:15:00Z',
-    category: 'Cine',
-    readTime: 10,
-    likes: 56,
-    comments: 8
-  }
-];
 
 const BlogsPage: React.FC = () => {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('Todos');
-  
+
   useEffect(() => {
-    // Simular carga de blogs
-    const loadBlogs = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setBlogs(sampleBlogs);
+    const fetchBlogs = async () => {
+      setIsLoading(true);
+      // Traer solo publicaciones tipo 'blog'
+      const { data, error } = await supabase
+        .from('publicaciones')
+        .select(`id, titulo, excerpt, imagen_portada, categoria, publicado_en, autor:usuarios(id, nombre_completo, avatar_url)`)
+        .eq('tipo', 'blog')
+        .order('publicado_en', { ascending: false });
+      if (error) {
+        setBlogs([]);
+        setIsLoading(false);
+        return;
+      }
+      const mapped = (data || []).map((b: any) => ({
+        id: b.id,
+        title: b.titulo,
+        excerpt: b.excerpt,
+        coverImage: b.imagen_portada,
+        authorId: b.autor?.id || '',
+        authorName: b.autor?.nombre_completo || 'Autor',
+        authorAvatar: b.autor?.avatar_url || '',
+        published: b.publicado_en,
+        category: b.categoria || 'General',
+      }));
+      setBlogs(mapped);
       setIsLoading(false);
     };
-    
-    loadBlogs();
+    fetchBlogs();
   }, []);
-  
+
   const categories = ['Todos', 'Arte', 'Música', 'Cine', 'Danza', 'Literatura'];
-  
+
   if (isLoading) {
     return (
       <div className="py-8 flex justify-center">
@@ -89,7 +63,7 @@ const BlogsPage: React.FC = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       {/* Featured Blog */}
@@ -156,17 +130,13 @@ const BlogsPage: React.FC = () => {
                       <span className="mx-2">•</span>
                       <Calendar className="h-3 w-3 mr-1" />
                       <span>{new Date(blog.published).toLocaleDateString('es-ES')}</span>
-                      <span className="mx-2">•</span>
-                      <span>{blog.readTime} min de lectura</span>
                     </div>
-                    
                     <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">
                       {blog.title}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
                       {blog.excerpt}
                     </p>
-                    
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
                         <div className="avatar h-6 w-6 mr-2">
@@ -177,17 +147,6 @@ const BlogsPage: React.FC = () => {
                           />
                         </div>
                         <span className="text-xs font-medium">{blog.authorName}</span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-3 text-gray-500 dark:text-gray-400">
-                        <div className="flex items-center text-xs">
-                          <Heart className="h-3 w-3 mr-1" />
-                          <span>{blog.likes}</span>
-                        </div>
-                        <div className="flex items-center text-xs">
-                          <MessageCircle className="h-3 w-3 mr-1" />
-                          <span>{blog.comments}</span>
-                        </div>
                       </div>
                     </div>
                   </div>

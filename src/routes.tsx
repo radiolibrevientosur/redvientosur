@@ -22,7 +22,12 @@ const MessagesPage = lazy(() => import('./pages/MessagesPage'));
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
+  const isLoading = useAuthStore((state) => state.isLoading);
+
+  if (isLoading) {
+    return <LoadingSpinner fullScreen message="Verificando sesión..." />;
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }

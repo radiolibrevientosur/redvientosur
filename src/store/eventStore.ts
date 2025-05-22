@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import { addDays, format, parse, startOfToday } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { supabase } from '../lib/supabase';
 
 export type EventType = 'event' | 'task' | 'birthday';
@@ -15,6 +15,23 @@ export interface Event {
   location?: string;
   userId: string;
   createdAt: string;
+  imagen_url?: string; // Soporte para la URL de imagen en la raíz
+  metadata?: {
+    target_audience?: string;
+    responsible_person?: {
+      name: string;
+      phone: string;
+      social_media?: string;
+    };
+    technical_requirements?: string[];
+    tags?: string[];
+    recurrence?: {
+      type: string;
+      interval?: number;
+      end_date?: string;
+      days_of_week?: number[];
+    };
+  };
 }
 
 interface EventState {
@@ -53,7 +70,9 @@ export const useEventStore = create<EventState>((set, get) => ({
         time: format(new Date(event.fecha_inicio), 'HH:mm'),
         location: event.ubicacion,
         userId: event.creador_id,
-        createdAt: event.creado_en
+        createdAt: event.creado_en,
+        imagen_url: event.imagen_url, // Añadir imagen_url desde la raíz
+        metadata: event.metadata || {}
       }));
 
       set({ events: transformedEvents, isLoading: false });
@@ -74,32 +93,59 @@ export const useEventStore = create<EventState>((set, get) => ({
         eventDate.setHours(parseInt(hours), parseInt(minutes));
       }
 
+      // Separar los datos entre la tabla eventos y el campo metadata
+      const { metadata, ...mainEventData } = event;
+      
+      const eventData = {
+        titulo: mainEventData.title,
+        descripcion: mainEventData.description,
+        tipo: mainEventData.type,
+        fecha_inicio: eventDate.toISOString(),
+        ubicacion: mainEventData.location,
+        creador_id: mainEventData.userId,
+        estado: 'publicado',
+        // Si la tabla aún no tiene el campo metadata, esto fallará silenciosamente
+        ...(metadata && { metadata })
+      };
+
+      let insertedData;
       const { data, error } = await supabase
         .from('eventos')
-        .insert({
-          titulo: event.title,
-          descripcion: event.description,
-          tipo: event.type,
-          fecha_inicio: eventDate.toISOString(),
-          ubicacion: event.location,
-          creador_id: event.userId,
-          estado: 'publicado'
-        })
+        .insert(eventData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Si el error es por la columna metadata, intentar sin ella
+        if (error.message.includes('metadata')) {
+          const { metadata: _, ...eventDataWithoutMetadata } = eventData;
+          const retryResult = await supabase
+            .from('eventos')
+            .insert(eventDataWithoutMetadata)
+            .select()
+            .single();
+            
+          if (retryResult.error) throw retryResult.error;
+          insertedData = retryResult.data;
+        } else {
+          throw error;
+        }
+      } else {
+        insertedData = data;
+      }
 
       const newEvent: Event = {
-        id: data.id,
-        title: data.titulo,
-        description: data.descripcion || '',
-        type: data.tipo,
-        date: data.fecha_inicio,
+        id: insertedData.id,
+        title: insertedData.titulo,
+        description: insertedData.descripcion || '',
+        type: insertedData.tipo,
+        date: insertedData.fecha_inicio,
         time: event.time,
-        location: data.ubicacion,
-        userId: data.creador_id,
-        createdAt: data.creado_en
+        location: insertedData.ubicacion,
+        userId: insertedData.creador_id,
+        createdAt: insertedData.creado_en,
+        imagen_url: insertedData.imagen_url, // Asignar la URL de la imagen si existe
+        metadata: insertedData.metadata || {}
       };
       
       set(state => ({ 
@@ -113,7 +159,7 @@ export const useEventStore = create<EventState>((set, get) => ({
         error: error instanceof Error ? error.message : 'Error al crear evento', 
         isLoading: false 
       });
-      toast.error('Error al crear evento');
+      toast.error(`Error al crear evento: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   },
   

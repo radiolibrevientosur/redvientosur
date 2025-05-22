@@ -62,6 +62,7 @@ interface CreateEventFormProps {
   date: Date;
   onSuccess: () => void;
   onCancel: () => void;
+  initialData?: Partial<EventSchema> & { id?: string };
 }
 
 interface EventData {
@@ -93,12 +94,21 @@ interface EventData {
   };
 }
 
-const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCancel }) => {
+const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCancel, initialData }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<EventSchema>({
+  const [imageSelected, setImageSelected] = useState(false);
+  const isEditMode = !!initialData;
+
+  const { register, handleSubmit, watch, setValue, formState: { errors }, reset } = useForm<EventSchema>({
     resolver: zodResolver(eventSchema),
-    defaultValues: {
+    defaultValues: initialData ? {
+      ...initialData,
+      date: initialData.date || date.toISOString().split('T')[0],
+      cost: initialData.cost || { type: 'free' },
+      technical_requirements: initialData.technical_requirements || [],
+      tags: initialData.tags || [],
+      recurrence: initialData.recurrence || { type: 'none' }
+    } : {
       date: date.toISOString().split('T')[0],
       cost: { type: 'free' },
       technical_requirements: [],
@@ -106,6 +116,19 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
       recurrence: { type: 'none' }
     }
   });
+
+  React.useEffect(() => {
+    if (initialData) {
+      reset({
+        ...initialData,
+        date: initialData.date || date.toISOString().split('T')[0],
+        cost: initialData.cost || { type: 'free' },
+        technical_requirements: initialData.technical_requirements || [],
+        tags: initialData.tags || [],
+        recurrence: initialData.recurrence || { type: 'none' }
+      });
+    }
+  }, [initialData, date, reset]);
 
   const category = watch('category');
   const costType = watch('cost.type');
@@ -119,27 +142,28 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
   const uploadImage = async (file: File): Promise<string | null> => {
     const fileName = `events/${Date.now()}_${file.name}`;
     const { error } = await supabase.storage
-      .from('event_images')
-      .upload(fileName, file);
+      .from('event-images')
+      .upload(fileName, file, { upsert: true });
 
     if (error) {
-      toast.error('Error al subir la imagen');
+      console.error('Error al subir imagen a Supabase:', error);
+      toast.error('Error al subir la imagen: ' + error.message);
       return null;
     }
 
     const { data: urlData } = supabase.storage
-      .from('event_images')
+      .from('event-images')
       .getPublicUrl(fileName);
 
     return urlData.publicUrl;
   };
 
   const handleImageChange = async (file: File | undefined) => {
+    setImageSelected(!!file);
     if (!file) {
       setValue('image_url', undefined);
       return;
     }
-    
     const imageUrl = await uploadImage(file);
     if (imageUrl) setValue('image_url', imageUrl);
   };
@@ -147,70 +171,99 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
   const onSubmit = async (formData: EventSchema) => {
     setIsSubmitting(true);
     try {
+      if (imageSelected && !formData.image_url) {
+        toast.error('La imagen no se subió correctamente. Intenta nuevamente.');
+        setIsSubmitting(false);
+        return;
+      }
       const { data: userData, error: userError } = await supabase.auth.getUser();
       if (userError) {
         console.error('Error de autenticación:', userError);
         toast.error('Error de autenticación. Por favor, inicia sesión nuevamente.');
         return;
       }
-      
       if (!userData.user) {
-        toast.error('Debes iniciar sesión para crear un evento');
+        toast.error('Debes iniciar sesión para crear o editar un evento');
         return;
       }
+      if (isEditMode && initialData?.id) {
+        // Modo edición: actualizar evento existente
+        const updateData: any = {
+          titulo: formData.title,
+          descripcion: formData.description,
+          tipo: formData.event_type,
+          categoria: formData.category,
+          fecha_inicio: new Date(formData.date).toISOString(),
+          ubicacion: formData.location,
+          imagen_url: formData.image_url,
+          precio: formData.cost.type === 'paid' ? formData.cost.amount || 0 : 0,
+          metadata: {
+            target_audience: formData.target_audience,
+            responsible_person: formData.responsible_person,
+            technical_requirements: formData.technical_requirements,
+            tags: formData.tags,
+            recurrence: formData.recurrence
+          }
+        };
+        const { error } = await supabase
+          .from('eventos')
+          .update(updateData)
+          .eq('id', initialData.id);
+        if (error) throw error;
+        toast.success('Evento actualizado exitosamente');
+        onSuccess();
+      } else {
+        // Modo creación: crear nuevo evento
+        const eventData: EventData = {
+          creador_id: userData.user.id,
+          titulo: formData.title,
+          descripcion: formData.description,
+          tipo: formData.event_type,
+          categoria: formData.category,
+          fecha_inicio: new Date(formData.date).toISOString(),
+          ubicacion: formData.location,
+          imagen_url: formData.image_url,
+          estado: 'publicado',
+          precio: formData.cost.type === 'paid' ? formData.cost.amount || 0 : 0,
+          metadata: {
+            target_audience: formData.target_audience,
+            responsible_person: formData.responsible_person,
+            technical_requirements: formData.technical_requirements,
+            tags: formData.tags,
+            recurrence: formData.recurrence
+          }
+        };
 
-      const eventData: EventData = {
-        creador_id: userData.user.id,
-        titulo: formData.title,
-        descripcion: formData.description,
-        tipo: formData.event_type,
-        categoria: formData.category,
-        fecha_inicio: new Date(formData.date).toISOString(),
-        ubicacion: formData.location,
-        imagen_url: formData.image_url,
-        estado: 'publicado',
-        precio: formData.cost.type === 'paid' ? formData.cost.amount || 0 : 0,
-        metadata: {
-          target_audience: formData.target_audience,
-          responsible_person: formData.responsible_person,
-          technical_requirements: formData.technical_requirements,
-          tags: formData.tags,
-          recurrence: formData.recurrence
+        const { data, error: eventError } = await supabase
+          .from('eventos')
+          .insert(eventData)
+          .select()
+          .single();
+
+        if (eventError) {
+          console.error('Error al crear evento:', eventError);
+          if (eventError.code === 'PGRST116') {
+            toast.error('No tienes permisos para crear eventos.');
+          } else if (eventError.code === '23503') {
+            toast.error('Error con la referencia del usuario. Por favor, inicia sesión nuevamente.');
+          } else {
+            toast.error(`Error al crear el evento: ${eventError.message}`);
+          }
+          return;
         }
-      };
 
-      console.log('Enviando datos del evento:', eventData);
-
-      const { data, error: eventError } = await supabase
-        .from('eventos')
-        .insert(eventData)
-        .select()
-        .single();
-
-      if (eventError) {
-        console.error('Error al crear evento:', eventError);
-        if (eventError.code === 'PGRST116') {
-          toast.error('No tienes permisos para crear eventos.');
-        } else if (eventError.code === '23503') {
-          toast.error('Error con la referencia del usuario. Por favor, inicia sesión nuevamente.');
-        } else {
-          toast.error(`Error al crear el evento: ${eventError.message}`);
+        if (!data) {
+          console.error('No se recibió confirmación del evento creado');
+          toast.error('Error al crear el evento: no se recibió confirmación');
+          return;
         }
-        return;
-      }
 
-      if (!data) {
-        console.error('No se recibió confirmación del evento creado');
-        toast.error('Error al crear el evento: no se recibió confirmación');
-        return;
+        toast.success('Evento creado exitosamente');
+        onSuccess();
       }
-
-      console.log('Evento creado exitosamente:', data);
-      toast.success('Evento creado exitosamente');
-      onSuccess();
     } catch (error) {
-      console.error('Error detallado al crear evento:', error);
-      toast.error('Error al crear el evento');
+      console.error('Error detallado al crear/editar evento:', error);
+      toast.error('Error al crear o editar el evento');
     } finally {
       setIsSubmitting(false);
     }

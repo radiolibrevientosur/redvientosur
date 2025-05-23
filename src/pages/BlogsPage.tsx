@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Book, Calendar, ArrowRight } from 'lucide-react';
+import { Book, Heart, MessageCircle, BookmarkCheck, User, Calendar, ArrowRight } from 'lucide-react';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -157,13 +157,12 @@ const BlogsPage: React.FC = () => {
       </div>
       
       {/* Create Blog Button */}
-      <div className="fixed bottom-20 right-4 z-40">
+      <div className="fixed bottom-20 right-4">
         <Link to="/blogs/new">
           <motion.button
             className="btn btn-primary rounded-full p-3 shadow-lg"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            aria-label="Crear nuevo blog"
           >
             <Book className="h-5 w-5" />
           </motion.button>

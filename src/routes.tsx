@@ -19,7 +19,6 @@ const BlogsPage = lazy(() => import('./pages/BlogsPage'));
 const StoriesPage = lazy(() => import('./pages/StoriesPage'));
 const StreamsPage = lazy(() => import('./pages/StreamsPage'));
 const MessagesPage = lazy(() => import('./pages/MessagesPage'));
-const NewBlogPage = lazy(() => import('./pages/NewBlogPage'));
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -54,7 +53,6 @@ const AppRoutes = () => {
           <Route path="calendar" element={<CalendarPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="blogs" element={<BlogsPage />} />
-          <Route path="blogs/new" element={<NewBlogPage />} />
           <Route path="stories" element={<StoriesPage />} />
           <Route path="streams" element={<StreamsPage />} />
           <Route path="messages" element={<MessagesPage />} />

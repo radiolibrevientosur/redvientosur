@@ -44,7 +44,6 @@ interface EventState {
   updateEvent: (id: string, eventData: Partial<Event>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
   getEventsByDate: (date: Date) => Event[];
-  addComment: (eventId: string, userId: string, content: string) => Promise<any>;
 }
 
 export const useEventStore = create<EventState>((set, get) => ({
@@ -237,23 +236,7 @@ export const useEventStore = create<EventState>((set, get) => ({
       const eventDate = format(new Date(event.date), 'yyyy-MM-dd');
       return eventDate === dateString;
     });
-  },
-
-  addComment: async (eventId, userId, content) => {
-    try {
-      const { data, error } = await supabase
-        .from('comentarios')
-        .insert({ evento_id: eventId, autor_id: userId, contenido: content })
-        .select()
-        .single();
-      if (error) throw error;
-      toast.success('Comentario agregado');
-      return data;
-    } catch (error) {
-      toast.error('Error al agregar comentario');
-      return null;
-    }
-  },
+  }
 }));
 
 // Format event date for display

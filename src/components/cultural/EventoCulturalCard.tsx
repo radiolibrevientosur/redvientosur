@@ -5,7 +5,8 @@ import {
   Heart, 
   Edit, 
   MessageCircle, 
-  Send 
+  Send,
+  Trash 
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
@@ -117,6 +118,21 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('¿Estás seguro de eliminar este evento?')) return;
+    try {
+      const { error } = await supabase
+        .from('eventos')
+        .delete()
+        .eq('id', event.id);
+      if (error) throw error;
+      toast.success('Evento eliminado exitosamente');
+      // Opcional: recargar eventos o emitir callback
+    } catch (error) {
+      toast.error('Error al eliminar el evento');
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
       <div className="relative h-48 w-full">
@@ -139,14 +155,22 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
           </div>
           <div className="flex space-x-2">
             {isCreator && (
-              <button
-                onClick={onEdit}
-                className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-              >
-                <Edit className="h-5 w-5" />
-              </button>
+              <>
+                <button
+                  onClick={onEdit}
+                  className="p-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <Edit className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="p-2 text-red-400 hover:text-red-600 dark:text-red-500 dark:hover:text-red-300"
+                  title="Eliminar evento"
+                >
+                  <Trash className="h-5 w-5" />
+                </button>
+              </>
             )}
-            {/* Botón de eliminar evento eliminado para evitar error de compilación */}
           </div>
         </div>
 

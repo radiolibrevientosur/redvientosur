@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Trash } from 'lucide-react';
 import { Post, formatPostDate, getUserById, usePostStore } from '../../store/postStore';
 import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
 
 interface PostCardProps {
   post: Post;
@@ -12,7 +14,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [commentText, setCommentText] = useState('');
   
   const { user } = useAuthStore();
-  const { toggleLike, addComment, toggleFavorite } = usePostStore();
+  const { toggleLike, addComment, toggleFavorite, removePost } = usePostStore();
   
   const postUser = getUserById(post.userId);
   const isLiked = user ? post.likes.includes(user.id) : false;
@@ -39,6 +41,22 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     // In a real app, implement sharing functionality
     alert('Sharing functionality would be implemented here');
   };
+
+  const handleDelete = async () => {
+    if (!user || user.id !== post.userId) return;
+    if (!window.confirm('¿Estás seguro de eliminar este post?')) return;
+    try {
+      const { error } = await supabase
+        .from('publicaciones')
+        .delete()
+        .eq('id', post.id);
+      if (error) throw error;
+      toast.success('Post eliminado exitosamente');
+      if (removePost) removePost(post.id); // Elimina de la UI si existe la función
+    } catch (error) {
+      toast.error('Error al eliminar el post');
+    }
+  };
   
   return (
     <article className="feed-item">
@@ -61,9 +79,16 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
             </p>
           </div>
         </div>
-        <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
-          <MoreHorizontal className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+            <MoreHorizontal className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          </button>
+          {user && user.id === post.userId && (
+            <button onClick={handleDelete} className="p-2 rounded-full hover:bg-red-100 dark:hover:bg-red-900">
+              <Trash className="h-5 w-5 text-red-500" />
+            </button>
+          )}
+        </div>
       </div>
       
       {/* Post Content */}

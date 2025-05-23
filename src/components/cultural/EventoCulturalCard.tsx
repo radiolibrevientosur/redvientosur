@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/authStore';
 import { getUserById } from '../../store/postStore';
+import { useEventStore } from '../../store/eventStore';
 
 interface EventoCulturalCardProps {
   event: {
@@ -46,6 +47,7 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
   const { user } = useAuthStore();
   const isCreator = user && event.userId && user.id === event.userId;
   const isLiked = user ? likes.includes(user.id) : false;
+  const addEventComment = useEventStore(state => state.addComment);
 
   React.useEffect(() => {
     // Cargar comentarios y usuarios
@@ -100,12 +102,8 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
     e.preventDefault();
     if (!newComment.trim() || !user) return;
     try {
-      const { data, error } = await supabase
-        .from('comentarios')
-        .insert({ evento_id: event.id, autor_id: user.id, contenido: newComment.trim() })
-        .select()
-        .single();
-      if (error) throw error;
+      const data = await addEventComment(event.id, user.id, newComment.trim());
+      if (!data) return;
       // Obtener datos de usuario para el nuevo comentario
       let userData = commentUsers[user.id];
       if (!userData) {
@@ -114,7 +112,6 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
       }
       setComments([...comments, data]);
       setNewComment('');
-      toast.success('Comentario agregado');
     } catch (error) {
       toast.error('Error al agregar el comentario');
     }

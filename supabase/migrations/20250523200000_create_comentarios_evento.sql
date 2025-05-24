@@ -11,14 +11,12 @@ create table if not exists comentarios_evento (
 -- Habilitar RLS
 alter table comentarios_evento enable row level security;
 
--- Permitir insertar comentarios solo a usuarios autenticados
 grant insert on comentarios_evento to authenticated;
 create policy "Permitir insertar comentarios a usuarios autenticados en eventos"
   on comentarios_evento
   for insert
   with check (auth.uid() = autor_id);
 
--- Permitir leer comentarios a cualquier usuario autenticado
 grant select on comentarios_evento to authenticated;
 create policy "Permitir leer comentarios de eventos a usuarios autenticados"
   on comentarios_evento

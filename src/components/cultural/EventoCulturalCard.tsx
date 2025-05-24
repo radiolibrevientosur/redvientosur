@@ -6,7 +6,8 @@ import {
   Edit, 
   MessageCircle, 
   Send,
-  Trash 
+  Trash,
+  Share2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
@@ -138,6 +139,19 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
     }
   };
 
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: event.titulo,
+        text: event.descripcion,
+        url: window.location.origin + '/eventos/' + event.id
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(window.location.origin + '/eventos/' + event.id);
+      toast.success('¡Enlace copiado!');
+    }
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden mb-6">
       <div className="relative h-48 w-full">
@@ -176,6 +190,13 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
                 </button>
               </>
             )}
+            <button
+              onClick={handleShare}
+              className="p-2 text-gray-400 hover:text-primary-600 dark:hover:text-primary-400"
+              title="Compartir evento"
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
           </div>
         </div>
 

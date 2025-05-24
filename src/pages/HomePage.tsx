@@ -2,25 +2,63 @@ import React, { useEffect, useState } from 'react';
 import CreatePostForm from '../components/posts/CreatePostForm';
 import PostCard from '../components/posts/PostCard';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import { usePostStore } from '../store/postStore';
 import { useEventStore } from '../store/eventStore';
 import { EventoCulturalCard } from '../components/cultural/EventoCulturalCard';
 import CreateEventForm from '../components/calendar/CreateEventForm';
 import { Event } from '../store/eventStore';
+import { Share2 } from 'lucide-react';
+import { toast } from 'sonner';
+
+const FEED_MODES = [
+  { label: 'Para ti', value: 'feed' },
+  { label: 'Lo último', value: 'timeline' }
+];
 
 const HomePage = () => {
   const { posts, isLoading: isLoadingPosts, fetchPosts } = usePostStore();
   const { events, isLoading: isLoadingEvents, fetchEvents } = useEventStore();
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [feedMode, setFeedMode] = useState<'feed' | 'timeline'>('feed');
+  const [eventMode, setEventMode] = useState<'feed' | 'timeline'>('feed');
 
   useEffect(() => {
     fetchPosts();
     fetchEvents();
   }, [fetchPosts, fetchEvents]);
 
+  // Handler genérico para compartir cualquier contenido
+  const handleShare = (type: 'post' | 'event', item: any) => {
+    let url = window.location.origin;
+    let title = '';
+    let text = '';
+    if (type === 'post') {
+      url += '/posts/' + item.id;
+      title = item.content?.slice(0, 60) || 'Post de Red Viento Sur';
+      text = item.content;
+    } else if (type === 'event') {
+      url += '/eventos/' + item.id;
+      title = item.titulo || item.title || 'Evento cultural';
+      text = item.descripcion || item.description || '';
+    }
+    if (navigator.share) {
+      navigator.share({ title, text, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success('¡Enlace copiado!');
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <CreatePostForm />
+      <CreatePostForm onSuccess={() => {
+        // Scroll automático al crear post
+        setTimeout(() => {
+          const firstPost = document.querySelector('.feed-item');
+          if (firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }} />
 
       {/* Modal de edición de evento */}
       {editingEvent && (
@@ -58,19 +96,37 @@ const HomePage = () => {
         </div>
       )}
 
+      {/* Selector Feed/Timeline */}
+      <div className="flex justify-center gap-4 my-4">
+        {FEED_MODES.map((mode) => (
+          <button
+            key={mode.value}
+            className={`px-4 py-2 rounded-full font-semibold transition-colors duration-150 ${feedMode === mode.value ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
+            onClick={() => setFeedMode(mode.value as 'feed' | 'timeline')}
+            aria-pressed={feedMode === mode.value}
+          >
+            {mode.label}
+          </button>
+        ))}
+      </div>
+
       {/* Eventos culturales destacados */}
       <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-4">Eventos culturales</h2>
       {isLoadingEvents ? (
-        <div className="py-8 flex justify-center">
-          <LoadingSpinner message="Cargando eventos..." />
+        <div>
+          {[...Array(2)].map((_, i) => <SkeletonCard key={i} type="event" />)}
         </div>
       ) : events.length === 0 ? (
         <div className="card py-8 text-center">
-          <p className="text-gray-500 dark:text-gray-400">No hay eventos culturales aún</p>
+          <p className="text-gray-500 dark:text-gray-400 text-lg font-semibold mb-2">No hay eventos culturales aún</p>
+          <p className="text-sm text-gray-400">¡Sé el primero en crear un evento!</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {events.map(event => (
+          {(eventMode === 'feed'
+            ? events.slice() // Feed: sin orden por likes (no existe likes en Event)
+            : events.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          ).map(event => (
             <EventoCulturalCard
               key={event.id}
               event={{
@@ -84,13 +140,14 @@ const HomePage = () => {
                 tipo: event.type,
                 userId: event.userId,
                 metadata: {
-                  target_audience: event.metadata?.target_audience || '',
+                  target_audience: event.metadata?.target_audience as any || '',
                   responsible_person: event.metadata?.responsible_person || { name: '', phone: '' },
                   technical_requirements: event.metadata?.technical_requirements || [],
                   tags: event.metadata?.tags || [],
                 }
               }}
               onEdit={() => setEditingEvent(event)}
+              onShare={() => handleShare('event', event)}
             />
           ))}
         </div>
@@ -99,20 +156,21 @@ const HomePage = () => {
       {/* Posts */}
       <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-8">Publicaciones</h2>
       {isLoadingPosts ? (
-        <div className="py-8 flex justify-center">
-          <LoadingSpinner message="Loading posts..." />
+        <div>
+          {[...Array(3)].map((_, i) => <SkeletonCard key={i} type="post" />)}
         </div>
       ) : posts.length === 0 ? (
         <div className="card py-8 text-center">
-          <p className="text-gray-500 dark:text-gray-400">No posts yet</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Create your first post to get started!
-          </p>
+          <p className="text-gray-500 dark:text-gray-400 text-lg font-semibold mb-2">No hay publicaciones aún</p>
+          <p className="text-sm text-gray-400">¡Crea tu primera publicación para comenzar!</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {posts.map(post => (
-            <PostCard key={post.id} post={post} />
+          {(feedMode === 'feed'
+            ? posts.slice().sort((a, b) => b.likes.length - a.likes.length) // Feed: más populares
+            : posts.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) // Timeline: lo último
+          ).map(post => (
+            <PostCard key={post.id} post={post} onShare={() => handleShare('post', post)} />
           ))}
         </div>
       )}

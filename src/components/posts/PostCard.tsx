@@ -88,8 +88,16 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   };
   
   const handleShare = () => {
-    // In a real app, implement sharing functionality
-    alert('Sharing functionality would be implemented here');
+    if (navigator.share) {
+      navigator.share({
+        title: post.content?.slice(0, 60) || 'Post de Red Viento Sur',
+        text: post.content,
+        url: window.location.origin + '/posts/' + post.id
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(window.location.origin + '/posts/' + post.id);
+      toast.success('¡Enlace copiado!');
+    }
   };
 
   const handleDelete = async () => {
@@ -247,6 +255,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <button 
             onClick={handleShare}
             className="flex items-center group"
+            title="Compartir"
           >
             <Share2 className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-primary-500" />
           </button>

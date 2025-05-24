@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Book, Calendar, ArrowRight } from 'lucide-react';
+import { Book, Calendar, ArrowRight, Share2 } from 'lucide-react';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -21,6 +21,11 @@ interface BlogPost {
   likesCount?: number;
 }
 
+const FEED_MODES = [
+  { label: 'Para ti', value: 'feed' },
+  { label: 'Lo último', value: 'timeline' }
+];
+
 const BlogsPage: React.FC = () => {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,6 +36,7 @@ const BlogsPage: React.FC = () => {
   const { user } = useAuthStore();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedMode, setFeedMode] = useState<'feed' | 'timeline'>('feed');
 
   useEffect(() => {
     const fetchBlogs = async () => {
@@ -125,6 +131,21 @@ const BlogsPage: React.FC = () => {
     }
   };
 
+  // Handler para compartir blogs
+  const handleShareBlog = (blog: BlogPost) => {
+    const url = window.location.origin + '/blogs/' + blog.id;
+    if (navigator.share) {
+      navigator.share({
+        title: blog.title,
+        text: blog.excerpt,
+        url
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success('¡Enlace copiado!');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="py-8 flex justify-center">
@@ -135,21 +156,18 @@ const BlogsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Featured Blog */}
-      <div className="relative rounded-xl overflow-hidden h-48 mb-6">
-        <img 
-          src="https://images.pexels.com/photos/3617457/pexels-photo-3617457.jpeg?auto=compress&cs=tinysrgb&w=600"
-          alt="Featured blog" 
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end p-4">
-          <span className="text-xs font-medium text-primary-300 mb-1">DESTACADO</span>
-          <h2 className="text-xl font-bold text-white mb-1">Festivales culturales: Espacios de integración</h2>
-          <p className="text-sm text-gray-200">Cómo los eventos masivos están redefiniendo el acceso a la cultura</p>
-          <Link to="/blogs/featured" className="mt-2 text-sm text-white flex items-center">
-            Leer más <ArrowRight className="ml-1 h-4 w-4" />
-          </Link>
-        </div>
+      {/* Selector Feed/Timeline para blogs */}
+      <div className="flex justify-center gap-4 my-4">
+        {FEED_MODES.map((mode) => (
+          <button
+            key={mode.value}
+            className={`px-4 py-2 rounded-full font-semibold transition-colors duration-150 ${feedMode === mode.value ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
+            onClick={() => setFeedMode(mode.value as 'feed' | 'timeline')}
+            aria-pressed={feedMode === mode.value}
+          >
+            {mode.label}
+          </button>
+        ))}
       </div>
       
       {/* Categories */}
@@ -176,6 +194,11 @@ const BlogsPage: React.FC = () => {
       <div className="space-y-4">
         {blogs
           .filter(blog => activeCategory === 'Todos' || blog.category === activeCategory)
+          .slice()
+          .sort((a, b) => feedMode === 'feed'
+            ? (b.likesCount || 0) - (a.likesCount || 0)
+            : new Date(b.published).getTime() - new Date(a.published).getTime()
+          )
           .map(blog => (
             <div key={blog.id} className="card p-4">
               <div className="flex flex-col md:flex-row">
@@ -235,6 +258,14 @@ const BlogsPage: React.FC = () => {
                       {expandedBlogId === blog.id ? 'Ocultar comentarios' : `Ver comentarios (${blog.commentsCount})`}
                     </button>
                     <span className="text-gray-500 text-xs">❤️ {blog.likesCount}</span>
+                    <button
+                      onClick={() => handleShareBlog(blog)}
+                      className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                      title="Compartir blog"
+                      aria-label="Compartir blog"
+                    >
+                      <Share2 className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    </button>
                   </div>
                   {expandedBlogId === blog.id && (
                     <div className="mt-3 border-t pt-3">

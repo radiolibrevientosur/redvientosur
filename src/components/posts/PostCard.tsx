@@ -4,6 +4,8 @@ import { Post, formatPostDate, getUserById, usePostStore } from '../../store/pos
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
 
 interface PostCardProps {
   post: Post;
@@ -18,9 +20,11 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
   const [commentUsers, setCommentUsers] = useState<Record<string, any>>({});
   const [loadingUser, setLoadingUser] = useState(true);
   const [loadingComments, setLoadingComments] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
   const { user } = useAuthStore();
   const { toggleLike, addComment, toggleFavorite } = usePostStore();
+  const commentInputRef = React.useRef<HTMLInputElement>(null);
 
   // Cargar usuario del post
   useEffect(() => {
@@ -102,6 +106,27 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     } catch (error) {
       toast.error('Error al eliminar el post');
     }
+  };
+
+  const handleEmojiSelect = (emoji: any) => {
+    // Insertar emoji en la posición actual del cursor
+    if (commentInputRef.current) {
+      const input = commentInputRef.current;
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const newValue =
+        commentText.slice(0, start) +
+        (emoji.native || emoji.skins?.[0]?.native || '') +
+        commentText.slice(end);
+      setCommentText(newValue);
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start + 2, start + 2); // 2 = longitud típica de emoji
+      }, 0);
+    } else {
+      setCommentText(commentText + (emoji.native || emoji.skins?.[0]?.native || ''));
+    }
+    setShowEmojiPicker(false);
   };
   
   return (
@@ -290,7 +315,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           )}
           
           {user && (
-            <form onSubmit={handleComment} className="flex items-center space-x-2">
+            <form onSubmit={handleComment} className="flex items-center space-x-2 relative">
               <div className="avatar w-8 h-8">
                 <img 
                   src={user.avatar} 
@@ -299,19 +324,34 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 />
               </div>
               <input
+                ref={commentInputRef}
                 type="text"
-                placeholder="Add a comment..."
+                placeholder="Añade un comentario..."
                 className="flex-1 bg-white dark:bg-gray-900 rounded-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
               />
+              <button
+                type="button"
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                onClick={() => setShowEmojiPicker((v) => !v)}
+                aria-label="Insertar emoji"
+                tabIndex={-1}
+              >
+                <span role="img" aria-label="emoji">😊</span>
+              </button>
               <button 
                 type="submit"
                 disabled={!commentText.trim()}
                 className="text-sm font-medium text-primary-600 dark:text-primary-400 disabled:opacity-50"
               >
-                Post
+                Publicar
               </button>
+              {showEmojiPicker && (
+                <div className="absolute z-50 bottom-12 right-0">
+                  <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />
+                </div>
+              )}
             </form>
           )}
         </div>

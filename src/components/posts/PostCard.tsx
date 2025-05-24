@@ -93,7 +93,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     if (!window.confirm('¿Estás seguro de eliminar este post?')) return;
     try {
       const { error } = await supabase
-        .from('publicaciones')
+        .from('posts') // Cambiado de 'publicaciones' a 'posts'
         .delete()
         .eq('id', post.id);
       if (error) throw error;

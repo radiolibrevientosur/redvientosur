@@ -54,7 +54,7 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
     // Cargar comentarios y usuarios
     const fetchComments = async () => {
       const { data } = await supabase
-        .from('comentarios')
+        .from('comentarios_evento')
         .select('*')
         .eq('evento_id', event.id)
         .order('creado_en', { ascending: true });
@@ -103,8 +103,13 @@ export const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, o
     e.preventDefault();
     if (!newComment.trim() || !user) return;
     try {
-      const data = await addEventComment(event.id, user.id, newComment.trim());
-      if (!data) return;
+      // Insertar en comentarios_evento
+      const { data, error } = await supabase
+        .from('comentarios_evento')
+        .insert({ evento_id: event.id, autor_id: user.id, contenido: newComment.trim() })
+        .select()
+        .single();
+      if (error) throw error;
       // Obtener datos de usuario para el nuevo comentario
       let userData = commentUsers[user.id];
       if (!userData) {

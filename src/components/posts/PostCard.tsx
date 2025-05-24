@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
+import { Link } from 'react-router-dom';
 
 interface PostCardProps {
   post: Post;
@@ -142,7 +143,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {/* Post Header */}
       <div className="p-4 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="avatar">
+          <Link to={postUser?.username ? `/profile/${postUser.username}` : '#'} className="avatar">
             {loadingUser ? (
               <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse" />
             ) : (
@@ -152,10 +153,16 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                 className="avatar-img"
               />
             )}
-          </div>
+          </Link>
           <div>
             <h3 className="font-semibold text-gray-900 dark:text-white">
-              {loadingUser ? <span className="bg-gray-200 rounded w-20 h-4 inline-block animate-pulse" /> : postUser?.displayName || 'Usuario'}
+              {loadingUser ? (
+                <span className="bg-gray-200 rounded w-20 h-4 inline-block animate-pulse" />
+              ) : (
+                <Link to={postUser?.username ? `/profile/${postUser.username}` : '#'} className="hover:underline">
+                  {postUser?.displayName || 'Usuario'}
+                </Link>
+              )}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {formatPostDate(post.createdAt)}

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import AudioRecorder from '../components/ui/AudioRecorder';
+import VideoRecorder from '../components/ui/VideoRecorder';
 
 const tabs = ['Primario', 'General', 'Solicitudes'];
 
@@ -13,6 +15,12 @@ const DirectMessagesPage: React.FC = () => {
   const [messageInput, setMessageInput] = useState('');
   const [loadingConvs, setLoadingConvs] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [sticker, setSticker] = useState<string | null>(null);
+  const [showAudioRecorder, setShowAudioRecorder] = useState(false);
+  const [showVideoRecorder, setShowVideoRecorder] = useState(false);
 
   // Cargar conversaciones
   useEffect(() => {
@@ -82,14 +90,35 @@ const DirectMessagesPage: React.FC = () => {
   // Enviar mensaje
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !selectedConversation || !messageInput.trim()) return;
+    if (!user || !selectedConversation || (!messageInput.trim() && !selectedFile && !audioUrl && !videoUrl && !sticker)) return;
+    let content = messageInput.trim();
+    let file_url = null;
+    let audio_url = null;
+    let video_url = null;
+    let sticker_url = null;
+    // Subir archivo si existe
+    if (selectedFile) {
+      const { data, error } = await supabase.storage.from('chat-files').upload(`messages/${Date.now()}_${selectedFile.name}`, selectedFile);
+      if (!error && data) file_url = data.path;
+    }
+    if (audioUrl) audio_url = audioUrl;
+    if (videoUrl) video_url = videoUrl;
+    if (sticker) sticker_url = sticker;
     await supabase.from('messages').insert({
       sender_id: user.id,
       receiver_id: selectedConversation.user_id,
-      content: messageInput.trim(),
+      content,
+      file_url,
+      audio_url,
+      video_url,
+      sticker_url,
       read: false,
     });
     setMessageInput('');
+    setSelectedFile(null);
+    setAudioUrl(null);
+    setVideoUrl(null);
+    setSticker(null);
     // Recargar mensajes
     const { data } = await supabase
       .from('messages')
@@ -173,7 +202,11 @@ const DirectMessagesPage: React.FC = () => {
                 messages.map(msg => (
                   <div key={msg.id} className={`flex ${user && msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-xs px-4 py-2 rounded-lg shadow text-sm ${user && msg.sender_id === user.id ? 'bg-blue-500 text-white' : 'bg-white border'}`}>
-                      <div>{msg.content}</div>
+                      {msg.content && <div>{msg.content}</div>}
+                      {msg.file_url && <a href={supabase.storage.from('chat-files').getPublicUrl(msg.file_url).publicURL} target="_blank" rel="noopener noreferrer" className="block text-blue-500">Archivo adjunto</a>}
+                      {msg.audio_url && <audio controls src={msg.audio_url} className="mt-2" />}
+                      {msg.video_url && <video controls src={msg.video_url} className="mt-2 max-w-xs" />}
+                      {msg.sticker_url && <img src={msg.sticker_url} alt="sticker" className="h-12 mt-2" />}
                       <div className="text-xs text-gray-300 mt-1 text-right">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     </div>
                   </div>
@@ -181,9 +214,20 @@ const DirectMessagesPage: React.FC = () => {
               )}
             </div>
             <form
-              className="flex items-center p-4 border-t bg-white"
+              className="flex items-center p-4 border-t bg-white gap-2"
               onSubmit={handleSendMessage}
             >
+              <label htmlFor="file-input" className="cursor-pointer p-2" title="Adjuntar archivo">📎</label>
+              <input
+                id="file-input"
+                type="file"
+                className="hidden"
+                onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+              />
+              <button type="button" className="p-2" title="Grabar audio" onClick={() => setShowAudioRecorder(v => !v)}>🎤</button>
+              <button type="button" className="p-2" title="Grabar video" onClick={() => setShowVideoRecorder(v => !v)}>📹</button>
+              <button type="button" className="p-2" title="Sticker like" onClick={() => setSticker('/stickers/like.png')}>👍</button>
+              <button type="button" className="p-2" title="Sticker love" onClick={() => setSticker('/stickers/love.png')}>❤️</button>
               <input
                 type="text"
                 className="flex-1 px-4 py-2 rounded-full border bg-gray-100 focus:outline-none"
@@ -195,10 +239,16 @@ const DirectMessagesPage: React.FC = () => {
               <button
                 type="submit"
                 className="ml-2 bg-blue-500 text-white px-4 py-2 rounded-full font-semibold hover:bg-blue-600 transition"
-                disabled={loadingMsgs || !messageInput.trim()}
+                disabled={loadingMsgs || (!messageInput.trim() && !selectedFile && !audioUrl && !videoUrl && !sticker)}
               >
                 Enviar
               </button>
+              {showAudioRecorder && (
+                <AudioRecorder onAudioReady={(url: string | null) => { setAudioUrl(url); setShowAudioRecorder(false); }} />
+              )}
+              {showVideoRecorder && (
+                <VideoRecorder onVideoReady={(url: string | null) => { setVideoUrl(url); setShowVideoRecorder(false); }} />
+              )}
             </form>
           </div>
         ) : (

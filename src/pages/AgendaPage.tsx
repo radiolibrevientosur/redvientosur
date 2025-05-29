@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { EventoCulturalCard } from "../components/cultural/EventoCulturalCard";
-import { CumpleañosCard } from "../components/cultural/CumpleañosCard";
+import EventoCulturalCard from "../components/cultural/EventoCulturalCard";
+import CumpleañosCard from "../components/cultural/CumpleañosCard";
 import { TareaCulturalKanban } from "../components/cultural/TareaCulturalKanban";
 import { supabase } from "../lib/supabase";
 import { format } from "date-fns";
@@ -18,7 +18,7 @@ const AgendaPage: React.FC = () => {
     // Cargar eventos culturales
     const fetchEventos = async () => {
       setLoadingEventos(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('eventos')
         .select('*')
         .order('fecha_inicio', { ascending: true });
@@ -103,7 +103,14 @@ const AgendaPage: React.FC = () => {
           <div>No hay eventos culturales.</div>
         ) : (
           eventosFiltrados.map(event => (
-            <EventoCulturalCard key={event.id} event={event} />
+            <EventoCulturalCard
+              key={event.id}
+              event={event}
+              onDeleted={() => {
+                // Eliminar el evento del estado local para que desaparezca de la lista
+                setEventos(prev => prev.filter(e => e.id !== event.id));
+              }}
+            />
           ))
         )}
       </section>
@@ -115,7 +122,14 @@ const AgendaPage: React.FC = () => {
           <div>No hay cumpleaños hoy.</div>
         ) : (
           cumpleanos.map(birthday => (
-            <CumpleañosCard key={birthday.id} birthday={birthday} />
+            <CumpleañosCard
+              key={birthday.id}
+              birthday={birthday}
+              onDeleted={() => {
+                // Eliminar el cumpleaños del estado local para que desaparezca de la lista
+                setCumpleanos(prev => prev.filter(c => c.id !== birthday.id));
+              }}
+            />
           ))
         )}
       </section>

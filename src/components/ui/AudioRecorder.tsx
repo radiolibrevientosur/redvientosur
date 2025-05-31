@@ -16,16 +16,22 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [pendingBlob, setPendingBlob] = useState<Blob | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
   const intervalId = useRef<NodeJS.Timeout | null>(null);
 
+  // 1. Animación visual del botón de grabación
+  // 2. Indicador de duración ya implementado
+  // 3. Feedback de subida ya implementado
+  // 4. Accesibilidad: vibración al iniciar grabación
   const startRecording = async () => {
     setAudioUrl(null);
     setTimer(0);
     setProgress(0);
     setUploading(false);
     setPendingBlob(null);
+    if (window.navigator.vibrate) window.navigator.vibrate([50, 30, 50]);
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mediaRecorder = new window.MediaRecorder(stream);
     mediaRecorderRef.current = mediaRecorder;
@@ -71,14 +77,16 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
       const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
       setAudioUrl(null);
       setPendingBlob(null);
+      // Publicar el audio: notificar al padre (CreatePostForm) que el audio está listo
       onAudioReady(urlData.publicUrl);
-      toast.success('Audio subido correctamente');
+      setShowCancelPrompt(false);
     } catch (err) {
       setUploading(false);
       setProgress(0);
       setAudioUrl(null);
       setPendingBlob(null);
       onAudioReady(null);
+      setShowCancelPrompt(false);
       toast.error('Error al subir audio');
     }
   };
@@ -108,6 +116,36 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
     }
   };
 
+  // 5. Previsualización y opción de eliminar ya implementadas
+  // 6. Soporte para pausar/reanudar (experimental)
+  const pauseRecording = () => {
+    if (mediaRecorderRef.current && recording && !isPaused) {
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+    }
+  };
+  const resumeRecording = () => {
+    if (mediaRecorderRef.current && recording && isPaused) {
+      mediaRecorderRef.current.resume();
+      setIsPaused(false);
+    }
+  };
+
+  // Cerrar previsualización al hacer clic fuera
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (!showCancelPrompt) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (previewRef.current && !previewRef.current.contains(event.target as Node)) {
+        setShowCancelPrompt(false);
+        setAudioUrl(null);
+        setPendingBlob(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCancelPrompt]);
+
   useImperativeHandle(ref, () => ({
     startRecording,
     stopRecording,
@@ -119,11 +157,12 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
   return (
     <div className="space-y-2">
       <div className="flex gap-2 items-center">
-        {!recording && !uploading && !showCancelPrompt && (
-          <button type="button" onClick={startRecording} className="btn btn-primary btn-sm">Grabar</button>
-        )}
         {recording && !showCancelPrompt && (
-          <button type="button" onClick={stopRecording} className="btn btn-danger btn-sm animate-pulse">Detener</button>
+          <>
+            <button type="button" onClick={stopRecording} className="btn btn-danger btn-sm animate-pulse">Detener</button>
+            <button type="button" onClick={pauseRecording} disabled={isPaused} className="btn btn-warning btn-xs ml-2">Pausar</button>
+            <button type="button" onClick={resumeRecording} disabled={!isPaused} className="btn btn-success btn-xs ml-2">Reanudar</button>
+          </>
         )}
         {recording && !showCancelPrompt && (
           <span className="text-red-500 font-mono animate-pulse">{timer}s</span>
@@ -133,11 +172,12 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
         )}
       </div>
       {showCancelPrompt && (
-        <div className="flex flex-col items-center gap-3 animate-fade-in bg-white dark:bg-gray-900 rounded-xl shadow-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div ref={previewRef} className="flex flex-col items-center gap-3 animate-fade-in bg-white dark:bg-gray-900 rounded-xl shadow-lg p-4 border border-gray-200 dark:border-gray-700">
           <div className="flex flex-col items-center gap-1">
             <span className="text-2xl font-bold text-primary-600 dark:text-primary-400 animate-bounce">¡Revisa tu nota de voz!</span>
             <span className="text-base text-gray-700 dark:text-gray-200">¿Quieres enviarla o descartarla?</span>
           </div>
+          {/* Previsualización y reproducción */}
           <audio src={audioUrl || undefined} controls className="w-full my-2 rounded-lg shadow" />
           <div className="flex gap-4 mt-2">
             <button type="button" onClick={confirmSend} className="btn btn-success btn-lg flex items-center gap-2 animate-bounce">

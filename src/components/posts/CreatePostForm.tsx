@@ -85,6 +85,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const handleAudioReady = (audioUrl: string | null) => {
     setMediaUrl(audioUrl || '');
     setPostType(audioUrl ? 'audio' : 'text');
+    setShowAudioRecorder(false); // Cierra el modal de grabación y previsualización al adjuntar el audio
+    setIsRecording(false);
   };
 
   // Nuevo handler para integración con VideoRecorder
@@ -100,6 +102,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     setShowFileUpload(false);
     setShowVideoRecorder(false);
     setIsRecording(true);
+    if (window.navigator.vibrate) window.navigator.vibrate([50, 30, 50]);
     setTimeout(() => {
       audioRecorderRef.current?.startRecording();
     }, 50); // pequeño delay para asegurar montaje
@@ -234,9 +237,12 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               )}
             </button>
           ) : (
+            // 1. Animación visual del botón de micrófono
+            // Cambia el color y agrega animación de círculo creciente durante la grabación
             <button
               type="button"
-              className={`p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 ml-1 ${showAudioRecorder ? 'bg-red-200 text-red-600' : ''}`}
+              className={`relative p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 ml-1 transition-all duration-200
+                ${showAudioRecorder ? 'bg-red-200 text-red-600 ring-4 ring-red-400/30 animate-pulse' : ''}`}
               onMouseDown={handleMicPress}
               onMouseUp={handleMicRelease}
               onMouseLeave={handleMicCancel}
@@ -246,7 +252,10 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               aria-label="Grabar nota de voz"
               disabled={isSubmitting}
             >
-              <Mic className="h-5 w-5" />
+              {isRecording && (
+                <span className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping" />
+              )}
+              <Mic className="h-5 w-5 relative z-10" />
             </button>
           )}
           {/* Botón cámara opcional, puedes dejarlo si lo usas mucho */}

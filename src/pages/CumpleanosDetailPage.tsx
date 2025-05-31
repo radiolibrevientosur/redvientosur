@@ -33,9 +33,10 @@ const CumpleanosDetailPage: React.FC = () => {
   if (!birthday) return <NotFoundPage />;
 
   return (
-    <div className="max-w-xl mx-auto p-4">
+    <main className="max-w-xl mx-auto p-4">
+      <a href="/agenda" className="text-primary-600 dark:text-primary-400 hover:underline mb-4 inline-block">← Volver a la agenda</a>
       <CumpleañosCard birthday={birthday} disableCardNavigation onDeleted={() => navigate('/agenda')} />
-    </div>
+    </main>
   );
 };
 

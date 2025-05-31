@@ -3,7 +3,6 @@ import EventoCulturalCard from "../components/cultural/EventoCulturalCard";
 import CumpleañosCard from "../components/cultural/CumpleañosCard";
 import { TareaCulturalKanban } from "../components/cultural/TareaCulturalKanban";
 import { supabase } from "../lib/supabase";
-import { format } from "date-fns";
 import { Search } from 'lucide-react';
 
 const AgendaPage: React.FC = () => {
@@ -29,17 +28,18 @@ const AgendaPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Cargar cumpleaños del día actual
+    // Cargar próximos cumpleaños (por ejemplo, próximos 30 días)
     const fetchCumpleanos = async () => {
       setLoadingCumpleanos(true);
       const today = new Date();
-      const mes = today.getMonth() + 1;
-      const dia = today.getDate();
+      const future = new Date();
+      future.setDate(today.getDate() + 30);
       const { data } = await supabase
         .from('cumpleanos')
         .select('*')
-        .filter('extract(month from fecha_nacimiento)', 'eq', mes)
-        .filter('extract(day from fecha_nacimiento)', 'eq', dia);
+        .gte('fecha_nacimiento', today.toISOString().slice(0, 10))
+        .lte('fecha_nacimiento', future.toISOString().slice(0, 10))
+        .order('fecha_nacimiento', { ascending: true });
       setCumpleanos(data || []);
       setLoadingCumpleanos(false);
     };
@@ -47,11 +47,35 @@ const AgendaPage: React.FC = () => {
   }, []);
 
   // Filtrar eventos por búsqueda y fecha
-  const eventosFiltrados = eventos.filter(event => {
-    const matchNombre = event.titulo?.toLowerCase().includes(search.toLowerCase());
-    const matchFecha = filterDate ? format(new Date(event.fecha_inicio), 'yyyy-MM-dd') === filterDate : true;
-    return matchNombre && matchFecha;
-  });
+  // const eventosFiltrados = eventos.filter(event => {
+  //   const matchNombre = event.titulo?.toLowerCase().includes(search.toLowerCase());
+  //   const matchFecha = filterDate ? format(new Date(event.fecha_inicio), 'yyyy-MM-dd') === filterDate : true;
+  //   return matchNombre && matchFecha;
+  // });
+
+  // Unificar feed de cumpleaños y eventos
+  const feed = [
+    ...cumpleanos.map(c => ({
+      ...c,
+      __type: 'cumple',
+      fecha: c.fecha_nacimiento
+    })),
+    ...eventos.map(e => ({
+      ...e,
+      __type: 'evento',
+      fecha: e.fecha_inicio
+    }))
+  ].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+
+  // Actualiza un cumpleaños editado en el array sin recargar todo
+  const handleCumpleEdited = (cumpleActualizado: any) => {
+    setCumpleanos(prev => prev.map(c => c.id === cumpleActualizado.id ? { ...c, ...cumpleActualizado } : c));
+  };
+
+  // Actualiza un evento editado en el array sin recargar todo
+  const handleEventoEdited = (eventoActualizado: any) => {
+    setEventos(prev => prev.map(e => e.id === eventoActualizado.id ? { ...e, ...eventoActualizado } : e));
+  };
 
   return (
     <main className="p-4 max-w-3xl mx-auto">
@@ -95,42 +119,30 @@ const AgendaPage: React.FC = () => {
           </button>
         </div>
       </div>
-      <section aria-labelledby="eventos-culturales" className="mb-8">
-        <h2 id="eventos-culturales" className="text-xl font-semibold mb-4">Eventos culturales</h2>
-        {loadingEventos ? (
-          <div>Cargando eventos...</div>
-        ) : eventosFiltrados.length === 0 ? (
-          <div>No hay eventos culturales.</div>
+      <section aria-labelledby="feed" className="mb-8">
+        <h2 id="feed" className="text-xl font-semibold mb-4">Próximos eventos y cumpleaños</h2>
+        {loadingEventos || loadingCumpleanos ? (
+          <div>Cargando...</div>
+        ) : feed.length === 0 ? (
+          <div>No hay eventos ni cumpleaños próximos.</div>
         ) : (
-          eventosFiltrados.map(event => (
-            <EventoCulturalCard
-              key={event.id}
-              event={event}
-              onDeleted={() => {
-                // Eliminar el evento del estado local para que desaparezca de la lista
-                setEventos(prev => prev.filter(e => e.id !== event.id));
-              }}
-            />
-          ))
-        )}
-      </section>
-      <section aria-labelledby="cumpleanos" className="mb-8">
-        <h2 id="cumpleanos" className="text-xl font-semibold mb-4">Cumpleaños</h2>
-        {loadingCumpleanos ? (
-          <div>Cargando cumpleaños...</div>
-        ) : cumpleanos.length === 0 ? (
-          <div>No hay cumpleaños hoy.</div>
-        ) : (
-          cumpleanos.map(birthday => (
-            <CumpleañosCard
-              key={birthday.id}
-              birthday={birthday}
-              onDeleted={() => {
-                // Eliminar el cumpleaños del estado local para que desaparezca de la lista
-                setCumpleanos(prev => prev.filter(c => c.id !== birthday.id));
-              }}
-            />
-          ))
+          feed.map(item =>
+            item.__type === 'cumple' ? (
+              <CumpleañosCard
+                key={item.id}
+                birthday={item}
+                onDeleted={() => setCumpleanos(prev => prev.filter(c => c.id !== item.id))}
+                onEdit={handleCumpleEdited}
+              />
+            ) : (
+              <EventoCulturalCard
+                key={item.id}
+                event={item}
+                onDeleted={() => setEventos(prev => prev.filter(e => e.id !== item.id))}
+                onEdit={handleEventoEdited}
+              />
+            )
+          )
         )}
       </section>
       <section aria-labelledby="tareas" className="mb-8">

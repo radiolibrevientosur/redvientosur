@@ -40,7 +40,7 @@ const eventSchema = z.object({
   event_type: z.string().min(1, 'Selecciona un tipo de evento'),
   date: z.string().min(1, 'La fecha es requerida'),
   location: z.string().min(3, 'La ubicación es requerida'),
-  target_audience: z.enum(['Infantil', 'Adultos', 'Todos']),
+  target_audience: z.enum(['Infantil', 'Adultos', 'Todo Público']),
   cost: z.object({
     type: z.enum(['free', 'paid']),
     amount: z.number().optional()
@@ -369,7 +369,7 @@ const CreateEventForm: React.FC<CreateEventFormProps> = ({ date, onSuccess, onCa
             {...register('target_audience')}
             className="input w-full"
           >
-            <option value="Todos">Todos</option>
+            <option value="Todo Público">Todo Público</option>
             <option value="Infantil">Infantil</option>
             <option value="Adultos">Adultos</option>
           </select>

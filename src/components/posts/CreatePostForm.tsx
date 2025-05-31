@@ -27,6 +27,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const [showAudioRecorder, setShowAudioRecorder] = useState(false);
   const [showVideoRecorder, setShowVideoRecorder] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
 
   const { user } = useAuthStore();
   const { addPost } = usePostStore();
@@ -136,10 +137,25 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     setShowEmojiPicker(false);
   };
 
+  // Cerrar menú al hacer clic fuera
+  type PlusMenuRefType = HTMLDivElement | null;
+  const plusMenuRef = useRef<PlusMenuRefType>(null);
+  React.useEffect(() => {
+    if (!showPlusMenu) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
+        setShowPlusMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPlusMenu]);
+
   return (
     <div className="feed-item mb-4">
       <form onSubmit={handleSubmit}>
-        <div className="p-4">
+        {/* Contenido superior (avatar y preview) */}
+        <div className="p-4 pb-2">
           <div className="flex items-start space-x-3">
             <div className="avatar">
               <img 
@@ -149,16 +165,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               />
             </div>
             <div className="flex-1">
-              <textarea
-                placeholder="¿Qué está pasando?"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className={`w-full p-2 text-gray-900 dark:text-white bg-transparent border-none focus:ring-0 resize-none ${!content.trim() && isSubmitting ? 'border border-red-500' : ''}`}
-                rows={3}
-                aria-label="Contenido de la publicación"
-                required={!mediaUrl}
-                disabled={isSubmitting}
-              />
               {/* Previsualización de archivos multimedia */}
               {previewUrl && postType === 'image' && (
                 <div className="mt-2 relative rounded-lg overflow-hidden">
@@ -201,32 +207,65 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
             </div>
           </div>
         </div>
-        <div className="px-4 py-3 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
-          <div className="flex items-center space-x-2">
-            {/* Botón emoji */}
-            <button
-              type="button"
-              className="p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-              onClick={() => setShowEmojiPicker((v) => !v)}
-              aria-label="Insertar emoji"
+        {/* Barra inferior tipo Telegram */}
+        <div className="px-4 py-2 flex items-end border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 rounded-b-2xl">
+          {/* Botón emoji */}
+          <button
+            type="button"
+            className="p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 mr-1"
+            onClick={() => setShowEmojiPicker((v) => !v)}
+            aria-label="Insertar emoji"
+            disabled={isSubmitting}
+          >
+            <span role="img" aria-label="emoji">😊</span>
+          </button>
+          {/* Botón clip para archivos */}
+          <button
+            type="button"
+            className="p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 mr-1"
+            onClick={() => { setShowFileUpload((v) => !v); setShowAudioRecorder(false); setShowVideoRecorder(false); }}
+            aria-label="Adjuntar archivo"
+            disabled={isSubmitting}
+          >
+            <FileText className="h-5 w-5" />
+          </button>
+          {/* Textarea tipo Telegram */}
+          <div className="flex-1 mx-1 relative">
+            <textarea
+              placeholder="¿Qué está pasando?"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full p-4 text-lg text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm resize-none min-h-[48px] max-h-[160px] transition-all placeholder-gray-400 dark:placeholder-gray-500"
+              rows={2}
+              aria-label="Contenido de la publicación"
+              required={!mediaUrl}
               disabled={isSubmitting}
+              style={{height: 'auto', boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)'}}
+              onInput={e => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = target.scrollHeight + 'px';
+              }}
+            />
+          </div>
+          {/* Botón micrófono o enviar, cambia según contenido */}
+          {content.trim() || mediaUrl ? (
+            <button 
+              type="submit"
+              disabled={isSubmitting || (!content.trim() && !mediaUrl)}
+              className="btn btn-primary p-2 rounded-full flex items-center justify-center ml-1"
+              aria-busy={isSubmitting}
             >
-              <span role="img" aria-label="emoji">😊</span>
+              {isSubmitting ? (
+                <span className="loader h-5 w-5" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
             </button>
-            {/* Botón clip para archivos */}
+          ) : (
             <button
               type="button"
-              className="p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
-              onClick={() => { setShowFileUpload((v) => !v); setShowAudioRecorder(false); setShowVideoRecorder(false); }}
-              aria-label="Adjuntar archivo"
-              disabled={isSubmitting}
-            >
-              <FileText className="h-5 w-5" />
-            </button>
-            {/* Botón micrófono para nota de voz */}
-            <button
-              type="button"
-              className={`p-2 rounded-full ${showAudioRecorder ? 'bg-red-200 text-red-600' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}
+              className={`p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 ml-1 ${showAudioRecorder ? 'bg-red-200 text-red-600' : ''}`}
               onMouseDown={handleMicPress}
               onMouseUp={handleMicRelease}
               onMouseLeave={handleMicCancel}
@@ -238,34 +277,21 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
             >
               <Mic className="h-5 w-5" />
             </button>
-            {/* Botón cámara para nota de video */}
-            <button
-              type="button"
-              className={`p-2 rounded-full ${showVideoRecorder ? 'bg-blue-200 text-blue-600' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'}`}
-              onMouseDown={handleCameraPress}
-              onMouseUp={handleCameraRelease}
-              onMouseLeave={handleCameraCancel}
-              onTouchStart={handleCameraPress}
-              onTouchEnd={handleCameraRelease}
-              onTouchCancel={handleCameraCancel}
-              aria-label="Grabar nota de video"
-              disabled={isSubmitting}
-            >
-              <Camera className="h-5 w-5" />
-            </button>
-          </div>
-          <button 
-            type="submit"
-            disabled={isSubmitting || (!content.trim() && !mediaUrl)}
-            className="btn btn-primary py-1.5 px-4 rounded-full disabled:opacity-50 flex items-center"
-            aria-busy={isSubmitting}
+          )}
+          {/* Botón cámara opcional, puedes dejarlo si lo usas mucho */}
+          <button
+            type="button"
+            className={`p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 ml-1 ${showVideoRecorder ? 'bg-blue-200 text-blue-600' : ''}`}
+            onMouseDown={handleCameraPress}
+            onMouseUp={handleCameraRelease}
+            onMouseLeave={handleCameraCancel}
+            onTouchStart={handleCameraPress}
+            onTouchEnd={handleCameraRelease}
+            onTouchCancel={handleCameraCancel}
+            aria-label="Grabar nota de video"
+            disabled={isSubmitting}
           >
-            {isSubmitting ? (
-              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
-            )}
-            {isSubmitting ? 'Publicando...' : 'Post'}
+            <Camera className="h-5 w-5" />
           </button>
         </div>
         {/* Subida de archivos con previsualización y progreso, solo si showFileUpload */}
@@ -307,12 +333,12 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
 
 export default CreatePostForm;
 
-/* Agrega la animación slide-down en tu CSS/tailwind:
-@keyframes slide-down {
-  0% { opacity: 0; transform: translateY(-16px) scale(0.95); }
+/* Agrega la animación slide-up en tu CSS/tailwind:
+@keyframes slide-up {
+  0% { opacity: 0; transform: translateY(16px) scale(0.95); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.animate-slide-down {
-  animation: slide-down 0.18s cubic-bezier(0.4,0,0.2,1);
+.animate-slide-up {
+  animation: slide-up 0.18s cubic-bezier(0.4,0,0.2,1);
 }
 */

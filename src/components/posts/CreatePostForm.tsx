@@ -151,6 +151,19 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showPlusMenu]);
 
+  // Cerrar menú al hacer clic fuera (emoji picker)
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (!showEmojiPicker) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showEmojiPicker]);
+
   return (
     <div className="feed-item mb-4">
       <form onSubmit={handleSubmit}>
@@ -165,7 +178,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               />
             </div>
             <textarea
-              placeholder="¿Qué está pasando?"
+              placeholder={`Hola ${user?.displayName || ''} ¿Qué está pasando?`}
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="flex-1 p-4 text-lg text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm resize-none min-h-[48px] max-h-[160px] transition-all placeholder-gray-400 dark:placeholder-gray-500"
@@ -280,7 +293,10 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
         )}
         {/* Selector de emoji */}
         {showEmojiPicker && (
-          <div className="fixed left-12 bottom-8 z-50 animate-slide-down shadow-2xl rounded-2xl bg-white dark:bg-gray-900 border border-primary-200 dark:border-primary-700">
+          <div
+            ref={emojiPickerRef}
+            className="fixed left-12 bottom-8 z-50 animate-slide-down shadow-2xl rounded-2xl bg-white dark:bg-gray-900 border border-primary-200 dark:border-primary-700"
+          >
             <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />
           </div>
         )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BookmarkCheck, PlusSquare, Calendar, User, BookOpen, Radio, MessageCircle } from 'lucide-react';
+import { Home, PlusSquare, Calendar, User, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
 
@@ -12,7 +12,7 @@ const BottomNavigation: React.FC = () => {
     { path: '/', icon: Home, label: 'Inicio' },
     { path: '/blogs', icon: BookOpen, label: 'Blogs' },
     { path: '/create', icon: PlusSquare, label: 'Crear' },
-    { path: '/streams', icon: Radio, label: 'En Vivo' },
+    { path: '/agenda', icon: Calendar, label: 'Agenda' },
     { path: user ? `/profile/${user.username}` : '/profile', icon: User, label: 'Perfil' }
   ];
   

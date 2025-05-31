@@ -162,13 +162,18 @@ const BlogsPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6" role="main" aria-label="Listado de blogs">
+    <div className="space-y-6 min-h-screen bg-gradient-to-b from-primary-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900" role="main" aria-label="Listado de blogs">
+      {/* Header visual atractivo */}
+      <header className="py-8 text-center">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-primary-700 dark:text-primary-300 drop-shadow-sm mb-2">Blogs culturales</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-lg">Descubre artículos, historias y novedades de la comunidad</p>
+      </header>
       {/* Selector Feed/Timeline para blogs */}
       <div className="flex justify-center gap-4 my-4">
         {FEED_MODES.map((mode) => (
           <button
             key={mode.value}
-            className={`px-5 py-2 rounded-full font-semibold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 text-base ${feedMode === mode.value ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
+            className={`px-5 py-2 rounded-full font-semibold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500 text-base ${feedMode === mode.value ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
             onClick={() => setFeedMode(mode.value as 'feed' | 'timeline')}
             aria-pressed={feedMode === mode.value}
             tabIndex={0}
@@ -184,7 +189,7 @@ const BlogsPage: React.FC = () => {
             <motion.button
               key={category}
               onClick={() => setActiveCategory(category)}
-              className={`px-4 py-2 rounded-full text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-primary-500 ${activeCategory === category ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
+              className={`px-4 py-2 rounded-full text-sm whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-primary-500 ${activeCategory === category ? 'bg-primary-600 text-white shadow' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}
               whileTap={{ scale: 0.95 }}
               aria-pressed={activeCategory === category}
               tabIndex={0}
@@ -195,7 +200,7 @@ const BlogsPage: React.FC = () => {
         </div>
       </nav>
       {/* Blog List */}
-      <div className="space-y-4">
+      <div className="space-y-8">
         {blogs
           .filter(blog => activeCategory === 'Todos' || blog.category === activeCategory)
           .slice()
@@ -204,132 +209,72 @@ const BlogsPage: React.FC = () => {
             : new Date(b.published).getTime() - new Date(a.published).getTime()
           )
           .map(blog => (
-            <article key={blog.id} className="card p-4" tabIndex={0} aria-label={`Blog: ${blog.title}`}> 
+            <article key={blog.id} className="card p-0 overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-200 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 group" tabIndex={0} aria-label={`Blog: ${blog.title}`}> 
               <div className="flex flex-col md:flex-row">
                 <div className="md:w-1/3 aspect-video md:aspect-square">
                   <img 
                     src={blog.coverImage} 
                     alt={blog.title} 
-                    className="w-full h-full object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                    className="w-full h-full object-cover rounded-none md:rounded-l-lg border-0 group-hover:scale-105 transition-transform duration-200"
                   />
                 </div>
-                <div className="p-4 md:w-2/3">
-                  <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 px-2 py-0.5 rounded-full">
-                      {blog.category}
-                    </span>
-                    <span className="mx-2">•</span>
-                    <Link to={`/blogs/${blog.id}`} className="flex items-center group hover:underline">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      <span>{new Date(blog.published).toLocaleDateString('es-ES')}</span>
-                    </Link>
+                <div className="p-6 md:w-2/3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 px-2 py-0.5 rounded-full">
+                        {blog.category}
+                      </span>
+                      <span className="mx-2">•</span>
+                      <Link to={`/blogs/${blog.id}`} className="flex items-center group hover:underline">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        <span>{new Date(blog.published).toLocaleDateString('es-ES')}</span>
+                      </Link>
+                    </div>
+                    <h3 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors duration-200">
+                      {blog.title}
+                    </h3>
+                    <p className="text-base text-gray-600 dark:text-gray-300 mb-3 line-clamp-3">
+                      {blog.excerpt}
+                    </p>
                   </div>
-                  <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">
-                    {blog.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                    {blog.excerpt}
-                  </p>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mt-4">
                     <Link to={blog.authorUsername ? `/profile/${blog.authorUsername}` : '#'} className="flex items-center group focus:outline-none focus:ring-2 focus:ring-primary-500" aria-label={`Ver perfil de ${blog.authorName}`}>
-                      <div className="avatar h-6 w-6 mr-2">
+                      <div className="avatar h-8 w-8 mr-2">
                         <img 
                           src={blog.authorAvatar} 
                           alt={blog.authorName} 
                           className="avatar-img rounded-full border border-gray-300 dark:border-gray-700"
                         />
                       </div>
-                      <span className="text-xs font-medium group-hover:underline">{blog.authorName}</span>
+                      <span className="text-sm font-medium group-hover:underline">{blog.authorName}</span>
                     </Link>
-                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                      <span className="flex items-center mr-4" aria-label="Comentarios">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-8 18v-4m8 4v-4m-8 0H3m18 0h-3" />
-                        </svg>
-                        {blog.commentsCount || 0}
+                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 gap-4">
+                      <span className="flex items-center" aria-label="Comentarios">
+                        💬 {blog.commentsCount || 0}
                       </span>
                       <span className="flex items-center" aria-label="Me gusta">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v8m4-4H8" />
-                        </svg>
-                        {blog.likesCount || 0}
+                        ❤️ {blog.likesCount || 0}
                       </span>
+                      <button
+                        onClick={() => handleShareBlog(blog)}
+                        className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        title="Compartir blog"
+                        aria-label="Compartir blog"
+                        tabIndex={0}
+                      >
+                        <Share2 className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 mt-2">
-                    <button
-                      className="text-primary-600 underline text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      onClick={() => handleShowComments(blog.id)}
-                      aria-expanded={expandedBlogId === blog.id}
-                      aria-controls={`comentarios-blog-${blog.id}`}
+                  <div className="flex items-center gap-4 mt-4">
+                    <Link
+                      to={`/blogs/${blog.id}`}
+                      className="btn btn-primary px-4 py-2 rounded-full text-white font-semibold shadow hover:scale-105 transition-transform duration-150"
                       tabIndex={0}
                     >
-                      {expandedBlogId === blog.id ? 'Ocultar comentarios' : `Ver comentarios (${blog.commentsCount})`}
-                    </button>
-                    <span className="text-gray-500 text-xs">❤️ {blog.likesCount}</span>
-                    <button
-                      onClick={() => handleShareBlog(blog)}
-                      className="ml-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      title="Compartir blog"
-                      aria-label="Compartir blog"
-                      tabIndex={0}
-                    >
-                      <Share2 className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    </button>
+                      Leer artículo <ArrowRight className="inline ml-2 h-4 w-4" />
+                    </Link>
                   </div>
-                  {expandedBlogId === blog.id && (
-                    <div className="mt-3 border-t pt-3" id={`comentarios-blog-${blog.id}`} role="region" aria-label={`Comentarios de ${blog.title}`}> 
-                      {loadingComments === blog.id ? (
-                        <div className="text-sm text-gray-500">Cargando comentarios...</div>
-                      ) : comments[blog.id]?.length === 0 ? (
-                        <div className="text-sm text-gray-400">Sin comentarios aún.</div>
-                      ) : (
-                        <ul className="space-y-2">
-                          {comments[blog.id].map((c: any) => (
-                            <li key={c.id} className="flex gap-2 items-start">
-                              <img src={c.autor?.avatar_url || '/default-avatar.png'} alt={c.autor?.nombre_completo || 'Usuario'} className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700" />
-                              <div>
-                                <span className="font-medium text-gray-900 dark:text-white text-sm">{c.autor?.nombre_completo || 'Usuario'}</span>
-                                <p className="text-gray-700 dark:text-gray-300 text-sm">{c.contenido}</p>
-                                <span className="text-xs text-gray-400">{new Date(c.creado_en).toLocaleString('es-ES')}</span>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {user && (
-                        <form
-                          className="flex gap-2 items-center mt-4"
-                          onSubmit={e => {
-                            e.preventDefault();
-                            handleAddComment(blog.id);
-                          }}
-                          role="form"
-                          aria-label="Agregar comentario"
-                        >
-                          <img src={user.avatar} alt={user.displayName} className="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700" />
-                          <input
-                            type="text"
-                            className="flex-1 input"
-                            placeholder="Escribe un comentario..."
-                            value={newComment}
-                            onChange={e => setNewComment(e.target.value)}
-                            disabled={isSubmitting}
-                            maxLength={300}
-                            aria-label="Escribe un comentario"
-                          />
-                          <button
-                            type="submit"
-                            className="btn btn-primary px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            disabled={isSubmitting || !newComment.trim()}
-                            aria-disabled={isSubmitting || !newComment.trim()}
-                          >
-                            {isSubmitting ? 'Enviando...' : 'Comentar'}
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             </article>

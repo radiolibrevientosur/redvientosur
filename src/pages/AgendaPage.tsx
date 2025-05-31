@@ -78,9 +78,12 @@ const AgendaPage: React.FC = () => {
   };
 
   return (
-    <main className="p-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Agenda</h1>
-      <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between">
+    <main className="p-4 max-w-3xl mx-auto min-h-screen bg-gradient-to-b from-primary-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900">
+      <header className="py-8 text-center">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-primary-700 dark:text-primary-300 drop-shadow-sm mb-2">Agenda cultural</h1>
+        <p className="text-gray-500 dark:text-gray-400 text-lg">Consulta y programa eventos, cumpleaños y tareas de la comunidad</p>
+      </header>
+      <div className="flex flex-col md:flex-row gap-4 mb-8 items-center justify-between">
         <div className="flex-1 flex flex-col md:flex-row gap-4">
           <div className="relative w-full md:w-1/2">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -91,7 +94,7 @@ const AgendaPage: React.FC = () => {
               placeholder="Buscar evento..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="pl-10 pr-3 py-2 rounded-full border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full transition shadow-sm"
+              className="pl-10 pr-3 py-2 rounded-full border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full transition shadow-sm text-base"
               aria-label="Buscar evento"
             />
           </div>
@@ -100,7 +103,7 @@ const AgendaPage: React.FC = () => {
               type="date"
               value={filterDate}
               onChange={e => setFilterDate(e.target.value)}
-              className="px-3 py-2 rounded-full border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full transition shadow-sm"
+              className="px-3 py-2 rounded-full border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full transition shadow-sm text-base"
               aria-label="Filtrar por fecha"
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
@@ -111,7 +114,7 @@ const AgendaPage: React.FC = () => {
         <div className="mt-4 md:mt-0">
           <button
             onClick={() => window.location.href = '/calendar'}
-            className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-primary-600 text-white font-semibold shadow hover:bg-primary-700 transition focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-primary-600 text-white font-semibold shadow-lg hover:bg-primary-700 transition focus:outline-none focus:ring-2 focus:ring-primary-500 text-base"
             aria-label="Programar evento"
           >
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" strokeWidth="2" d="M12 5v14m7-7H5"/></svg>
@@ -119,35 +122,43 @@ const AgendaPage: React.FC = () => {
           </button>
         </div>
       </div>
-      <section aria-labelledby="feed" className="mb-8">
-        <h2 id="feed" className="text-xl font-semibold mb-4">Próximos eventos y cumpleaños</h2>
+      <section aria-labelledby="feed" className="mb-12">
+        <h2 id="feed" className="text-2xl font-bold mb-6 text-primary-700 dark:text-primary-300">Próximos eventos y cumpleaños</h2>
         {loadingEventos || loadingCumpleanos ? (
-          <div>Cargando...</div>
+          <div className="text-center text-lg text-gray-500 py-8">Cargando...</div>
         ) : feed.length === 0 ? (
-          <div>No hay eventos ni cumpleaños próximos.</div>
+          <div className="text-center text-gray-400 py-8">No hay eventos ni cumpleaños próximos.</div>
         ) : (
-          feed.map(item =>
-            item.__type === 'cumple' ? (
-              <CumpleañosCard
-                key={item.id}
-                birthday={item}
-                onDeleted={() => setCumpleanos(prev => prev.filter(c => c.id !== item.id))}
-                onEdit={handleCumpleEdited}
-              />
-            ) : (
-              <EventoCulturalCard
-                key={item.id}
-                event={item}
-                onDeleted={() => setEventos(prev => prev.filter(e => e.id !== item.id))}
-                onEdit={handleEventoEdited}
-              />
-            )
-          )
+          <div className="space-y-6">
+            {feed.map(item =>
+              item.__type === 'cumple' ? (
+                <div className="shadow-lg rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-0">
+                  <CumpleañosCard
+                    key={item.id}
+                    birthday={item}
+                    onDeleted={() => setCumpleanos(prev => prev.filter(c => c.id !== item.id))}
+                    onEdit={handleCumpleEdited}
+                  />
+                </div>
+              ) : (
+                <div className="shadow-lg rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-0">
+                  <EventoCulturalCard
+                    key={item.id}
+                    event={item}
+                    onDeleted={() => setEventos(prev => prev.filter(e => e.id !== item.id))}
+                    onEdit={handleEventoEdited}
+                  />
+                </div>
+              )
+            )}
+          </div>
         )}
       </section>
       <section aria-labelledby="tareas" className="mb-8">
-        <h2 id="tareas" className="text-xl font-semibold mb-4">Tareas</h2>
-        <TareaCulturalKanban />
+        <h2 id="tareas" className="text-2xl font-bold mb-6 text-primary-700 dark:text-primary-300">Tareas</h2>
+        <div className="shadow-lg rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-4">
+          <TareaCulturalKanban />
+        </div>
       </section>
     </main>
   );

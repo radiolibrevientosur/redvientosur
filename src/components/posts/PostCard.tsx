@@ -146,9 +146,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
   }
   
   return (
-    <article className="feed-item" style={{ overflow: 'visible' }}>
+    <article className="feed-item rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-shadow duration-200 mb-6 overflow-visible">
       {/* Post Header */}
-      <div className="p-4 flex items-center justify-between">
+      <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center space-x-3">
           {postUser?.username ? (
             <Link to={`/profile/${postUser.username}`} className="avatar" aria-label={`Ver perfil de ${postUser.displayName || 'Usuario'}`}> 
@@ -251,8 +251,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       </div>
       
       {/* Post Content */}
-      <div className="px-4 pb-3">
-        <p className="mb-3 text-gray-900 dark:text-white">{post.content}</p>
+      <div className="px-4 pb-3 pt-2">
+        <p className="mb-3 text-gray-900 dark:text-white text-base leading-relaxed whitespace-pre-line break-words">{post.content}</p>
       </div>
       
       {/* Enlaces en el contenido del post */}
@@ -275,32 +275,32 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       
       {/* Post Media */}
       {post.mediaUrl && post.type === 'image' && (
-        <div className="relative pb-3">
+        <div className="relative pb-3 flex justify-center">
           <img 
             src={post.mediaUrl} 
             alt="Post media" 
-            className="w-full object-cover max-h-[500px]"
+            className="rounded-xl border border-gray-200 dark:border-gray-800 w-auto max-w-full max-h-[350px] object-contain shadow-sm hover:shadow-md transition-shadow duration-200"
           />
         </div>
       )}
       {post.mediaUrl && post.type === 'video' && (
-        <div className="relative pb-3">
-          <video src={post.mediaUrl} controls className="w-full max-h-[500px] rounded-lg" />
+        <div className="relative pb-3 flex justify-center">
+          <video src={post.mediaUrl} controls className="rounded-xl border border-gray-200 dark:border-gray-800 w-auto max-w-full max-h-[350px] object-contain shadow-sm" />
         </div>
       )}
       {post.mediaUrl && post.type === 'audio' && (
-        <div className="relative pb-3">
+        <div className="relative pb-3 flex items-center">
           <audio src={post.mediaUrl} controls className="w-full" />
         </div>
       )}
       {post.mediaUrl && post.type === 'document' && (
-        <div className="relative pb-3">
+        <div className="relative pb-3 flex items-center">
           <a href={post.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Ver documento</a>
         </div>
       )}
       
       {/* Post Actions */}
-      <div className="px-4 py-2 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
+      <div className="px-4 py-2 flex items-center justify-between border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 rounded-b-2xl">
         <div className="flex items-center space-x-6">
           <button 
             onClick={handleLike}

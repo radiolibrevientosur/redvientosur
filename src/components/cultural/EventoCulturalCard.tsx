@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -22,18 +21,18 @@ interface EventoCulturalCardProps {
     fecha_inicio: string;
     ubicacion: string;
     imagen_url?: string;
-    categoria: string;
+    categoria?: string; // <-- Hacer opcional
     tipo: string;
-    userId?: string; // <-- Añadido para control de edición
-    metadata: {
-      target_audience: string;
-      responsible_person: {
+    userId?: string;
+    metadata?: {
+      target_audience?: string;
+      responsible_person?: {
         name: string;
         phone: string;
         social_media?: string;
       };
-      technical_requirements: string[];
-      tags: string[];
+      technical_requirements?: string[];
+      tags?: string[];
     };
   };
   onEdit?: () => void;
@@ -250,69 +249,82 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
           </button>
         </div>
 
-        {/* Lista de comentarios */}
-        {(comments.length > 0 || isCommentExpanded) && (
-          <div className="mb-4 space-y-3">
-            {comments.slice(0, isCommentExpanded ? undefined : 2).map(comment => {
+        {/* Formulario de comentario */}
+        {user && (
+          <form onSubmit={handleAddComment} className="flex items-center space-x-4 mb-4">
+            <img
+              src={user.avatar || '/default-avatar.png'}
+              alt={user.displayName || 'Usuario'}
+              className="w-10 h-10 rounded-full"
+            />
+            <input
+              type="text"
+              value={newComment}
+              onChange={e => setNewComment(e.target.value)}
+              placeholder="Escribe un comentario..."
+              className="flex-1 px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-semibold text-white bg-primary-600 rounded-lg hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:outline-none"
+            >
+              <Send className="w-5 h-5 -mr-1" />
+              <span>Enviar</span>
+            </button>
+          </form>
+        )}
+
+        {/* Comentarios */}
+        {(comments.length > 0 && isCommentExpanded) && (
+          <div className="space-y-4">
+            {comments.map(comment => {
+              const isCommentAuthor = comment.autor_id === user?.id;
               const commentUser = commentUsers[comment.autor_id];
               return (
-                <div key={comment.id} className="flex space-x-2">
-                  <div className="flex-shrink-0">
-                    <Link to={commentUser?.username ? `/profile/${commentUser.username}` : '#'} className="avatar w-8 h-8 block">
-                      <img
-                        src={commentUser?.avatar || '/default-avatar.png'}
-                        alt={commentUser?.displayName || 'Usuario'}
-                        className="avatar-img"
-                      />
-                    </Link>
-                  </div>
-                  <div className="flex-1">
-                    <div className="bg-white dark:bg-gray-900 p-2 rounded-lg">
-                      <Link to={commentUser?.username ? `/profile/${commentUser.username}` : '#'} className="font-medium text-sm text-gray-900 dark:text-white hover:underline">
+                <div key={comment.id} className="flex items-start space-x-3">
+                  <img
+                    src={commentUser?.avatar || '/default-avatar.png'}
+                    alt={commentUser?.displayName || 'Usuario'}
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <div className="flex-1 p-4 text-sm bg-gray-100 dark:bg-gray-900 rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-semibold text-gray-800 dark:text-gray-200">
                         {commentUser?.displayName || 'Usuario'}
-                      </Link>
-                      <p className="text-sm text-gray-700 dark:text-gray-300">{comment.contenido}</p>
+                      </span>
+                      {isCommentAuthor && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (window.confirm('¿Deseas eliminar tu comentario?')) {
+                              const { error } = await supabase
+                                .from('comentarios_evento')
+                                .delete()
+                                .eq('id', comment.id);
+                              if (error) {
+                                toast.error('Error al eliminar el comentario');
+                              } else {
+                                setComments(comments.filter(c => c.id !== comment.id));
+                                toast.success('Comentario eliminado');
+                              }
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-500"
+                          aria-label="Eliminar comentario"
+                        >
+                          &times;
+                        </button>
+                      )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">{comment.creado_en ? format(new Date(comment.creado_en), 'd MMM HH:mm', { locale: es }) : ''}</p>
+                    <p className="text-gray-700 dark:text-gray-300">
+                      {comment.contenido}
+                    </p>
                   </div>
                 </div>
               );
             })}
-            {comments.length > 2 && !isCommentExpanded && (
-              <button onClick={() => setIsCommentExpanded(true)} className="text-sm text-primary-600 dark:text-primary-400 font-medium">
-                Ver todos los comentarios
-              </button>
-            )}
           </div>
         )}
-
-        <div className="border-t dark:border-gray-700 pt-4">
-          {user && (
-            <form onSubmit={handleAddComment} className="flex gap-2 items-center">
-              <div className="avatar w-8 h-8">
-                <img
-                  src={user.avatar}
-                  alt={user.displayName}
-                  className="avatar-img"
-                />
-              </div>
-              <input
-                type="text"
-                placeholder="Escribe un comentario..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="flex-1 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={!newComment.trim()}
-                className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-              >
-                <Send className="h-5 w-5" />
-              </button>
-            </form>
-          )}
-        </div>
       </div>
     </div>
   );

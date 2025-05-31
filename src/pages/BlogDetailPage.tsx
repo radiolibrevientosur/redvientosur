@@ -78,6 +78,9 @@ const BlogDetailPage: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-4">
+      <button onClick={() => window.location.href = '/'} className="text-primary-600 dark:text-primary-400 hover:underline mb-4">
+        ← Volver a inicio
+      </button>
       <div className="mb-4">
         <img src={blog.coverImage} alt={blog.title} className="w-full h-64 object-cover rounded-lg mb-4" />
         <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">

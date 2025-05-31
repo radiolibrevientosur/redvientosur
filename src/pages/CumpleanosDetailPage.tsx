@@ -34,7 +34,7 @@ const CumpleanosDetailPage: React.FC = () => {
 
   return (
     <main className="max-w-xl mx-auto p-4">
-      <a href="/agenda" className="text-primary-600 dark:text-primary-400 hover:underline mb-4 inline-block">← Volver a la agenda</a>
+      <button onClick={() => navigate('/')} className="text-primary-600 dark:text-primary-400 hover:underline mb-4">← Volver a inicio</button>
       <CumpleañosCard birthday={birthday} disableCardNavigation onDeleted={() => navigate('/agenda')} />
     </main>
   );

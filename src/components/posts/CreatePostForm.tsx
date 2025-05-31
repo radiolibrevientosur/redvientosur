@@ -18,8 +18,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const [mediaUrl, setMediaUrl] = useState('');
   const [postType, setPostType] = useState<PostType>('text');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const audioRecorderRef = useRef<any>(null);
   const videoRecorderRef = useRef<any>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -27,7 +25,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const [showAudioRecorder, setShowAudioRecorder] = useState(false);
   const [showVideoRecorder, setShowVideoRecorder] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showPlusMenu, setShowPlusMenu] = useState(false);
 
   const { user } = useAuthStore();
   const { addPost } = usePostStore();
@@ -55,8 +52,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
       setContent('');
       setMediaUrl('');
       setPostType('text');
-      setPreviewUrl(null);
-      setAudioPreviewUrl(null);
       toast.success('¡Publicación creada exitosamente!');
       if (onSuccess) onSuccess();
     } catch (error) {
@@ -140,33 +135,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     setShowEmojiPicker(false);
   };
 
-  // Cerrar menú al hacer clic fuera
-  type PlusMenuRefType = HTMLDivElement | null;
-  const plusMenuRef = useRef<PlusMenuRefType>(null);
-  React.useEffect(() => {
-    if (!showPlusMenu) return;
-    function handleClickOutside(event: MouseEvent) {
-      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
-        setShowPlusMenu(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showPlusMenu]);
-
-  // Cerrar menú al hacer clic fuera (emoji picker)
-  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
-  React.useEffect(() => {
-    if (!showEmojiPicker) return;
-    function handleClickOutside(event: MouseEvent) {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
-        setShowEmojiPicker(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showEmojiPicker]);
-
   return (
     <div className="feed-item mb-4">
       <form onSubmit={handleSubmit}>
@@ -210,7 +178,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
           >
             <span role="img" aria-label="emoji">😊</span>
           </button>
-          {/* Botón clip para archivos */}
+          {/* Botón clip para archivos: debe estar visible directamente, sin desplegar otro botón */}
           <button
             type="button"
             className="p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 mr-1"
@@ -303,7 +271,6 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
         {/* Selector de emoji */}
         {showEmojiPicker && (
           <div
-            ref={emojiPickerRef}
             className="fixed left-12 bottom-8 z-50 animate-slide-down shadow-2xl rounded-2xl bg-white dark:bg-gray-900 border border-primary-200 dark:border-primary-700"
           >
             <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />

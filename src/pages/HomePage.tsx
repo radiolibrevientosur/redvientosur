@@ -18,7 +18,6 @@ const HomePage = () => {
   const { events, isLoading: isLoadingEvents, fetchEvents } = useEventStore();
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [feedMode, setFeedMode] = useState<'feed' | 'timeline'>('feed');
-  const [eventMode] = useState<'feed' | 'timeline'>('feed');
   // Estados locales para manipulación inmediata de UI
   const [localPosts, setLocalPosts] = useState(posts);
   const [localEvents, setLocalEvents] = useState(events);
@@ -35,29 +34,46 @@ const HomePage = () => {
     fetchEvents();
   }, [fetchPosts, fetchEvents]);
 
-  // Handler genérico para compartir cualquier contenido
-  // const handleShare = (type: 'post' | 'event', item: any) => {
-  //   let url = window.location.origin;
-  //   let title = '';
-  //   let text = '';
-  //   if (type === 'post') {
-  //     url += '/posts/' + item.id;
-  //     title = item.content?.slice(0, 60) || 'Post de Red Viento Sur';
-  //     text = item.content;
-  //   } else if (type === 'event') {
-  //     url += '/eventos/' + item.id;
-  //     title = item.titulo || item.title || 'Evento cultural';
-  //     text = item.descripcion || item.description || '';
-  //   }
-  //   if (navigator.share) {
-  //     navigator.share({ title, text, url }).catch(() => {});
-  //   } else {
-  //     navigator.clipboard.writeText(url);
-  //     toast.success('¡Enlace copiado!');
-  //   }
-  // };
+  // Simulación de cumpleaños (puedes reemplazar por tu fuente real)
+  const [localBirthdays] = useState<any[]>([
+    // Ejemplo:
+    // { id: 'b1', name: 'Juan Pérez', date: '2025-06-01' },
+  ]);
 
+  // Unificar feed: posts, eventos y cumpleaños
+  const unifiedFeed = [
+    ...localPosts.map(post => ({
+      type: 'post',
+      date: new Date(post.createdAt),
+      post
+    })),
+    ...localEvents
+      .filter(event => event.date && !isNaN(new Date(event.date).getTime()))
+      .map(event => ({
+        type: 'event',
+        date: new Date(event.date),
+        event
+      })),
+    ...localBirthdays.map(birthday => ({
+      type: 'birthday',
+      date: new Date(birthday.date),
+      birthday
+    }))
+  ];
 
+  // Ordenar según modo
+  const sortedFeed = feedMode === 'feed'
+    ? unifiedFeed.slice().sort((a, b) => {
+        if (a.type === 'post' && b.type === 'post' && 'post' in a && 'post' in b) {
+          return b.post.likes.length - a.post.likes.length;
+        }
+        // Si solo uno es post, el post va primero
+        if (a.type === 'post') return -1;
+        if (b.type === 'post') return 1;
+        // Si ambos no son post, ordenar por fecha
+        return b.date.getTime() - a.date.getTime();
+      })
+    : unifiedFeed.slice().sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
     <div className="space-y-4">
@@ -87,13 +103,12 @@ const HomePage = () => {
                 id: editingEvent.id,
                 title: editingEvent.title,
                 description: editingEvent.description,
-                // category: editingEvent.metadata?.category || '', // Eliminar, no existe en metadata
                 event_type: editingEvent.type,
                 date: editingEvent.date.split('T')[0],
                 location: editingEvent.location,
-                target_audience: (['Infantil', 'Adultos', 'Todos'].includes(editingEvent.metadata?.target_audience ?? '')
+                target_audience: (['Infantil', 'Adultos', 'Todo Público'].includes(editingEvent.metadata?.target_audience ?? '')
                   ? editingEvent.metadata?.target_audience
-                  : undefined) as 'Infantil' | 'Adultos' | 'Todos' | undefined,
+                  : undefined) as 'Infantil' | 'Adultos' | 'Todo Público' | undefined,
                 cost: { type: 'free' },
                 responsible_person: editingEvent.metadata?.responsible_person || { name: '', phone: '' },
                 technical_requirements: editingEvent.metadata?.technical_requirements || [],
@@ -129,76 +144,46 @@ const HomePage = () => {
         ))}
       </div>
 
-      {/* Eventos culturales destacados */}
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-4">Eventos culturales</h2>
-      {isLoadingEvents ? (
-        <div>
-          {[...Array(2)].map((_, i) => <SkeletonCard key={i} type="event" />)}
-        </div>
-      ) : localEvents.length === 0 ? (
-        <div className="card py-8 text-center">
-          <p className="text-gray-500 dark:text-gray-400 text-lg font-semibold mb-2">No hay eventos culturales aún</p>
-          <p className="text-sm text-gray-400">¡Sé el primero en crear un evento!</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {(eventMode === 'feed'
-            ? localEvents.slice()
-            : localEvents.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          ).map(event => (
-            <EventoCulturalCard
-              key={event.id}
-              event={{
-                id: event.id,
-                titulo: event.title,
-                descripcion: event.description,
-                fecha_inicio: event.date,
-                ubicacion: event.location || '',
-                imagen_url: event.imagen_url,
-                categoria: '',
-                tipo: event.type,
-                userId: event.userId,
-                metadata: {
-                  target_audience: event.metadata?.target_audience as any || '',
-                  responsible_person: event.metadata?.responsible_person || { name: '', phone: '' },
-                  technical_requirements: event.metadata?.technical_requirements || [],
-                  tags: event.metadata?.tags || [],
-                }
-              }}
-              onEdit={() => setEditingEvent(event)}
-              onDeleted={() => {
-                setLocalEvents((prev) => prev.filter((e) => e.id !== event.id));
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Posts */}
-      <h2 className="text-lg font-bold text-gray-900 dark:text-white mt-8">Publicaciones</h2>
-      {isLoadingPosts ? (
+      {/* Feed unificado */}
+      {(isLoadingPosts || isLoadingEvents) ? (
         <div>
           {[...Array(3)].map((_, i) => <SkeletonCard key={i} type="post" />)}
         </div>
-      ) : localPosts.length === 0 ? (
+      ) : sortedFeed.length === 0 ? (
         <div className="card py-8 text-center">
-          <p className="text-gray-500 dark:text-gray-400 text-lg font-semibold mb-2">No hay publicaciones aún</p>
-          <p className="text-sm text-gray-400">¡Crea tu primera publicación para comenzar!</p>
+          <p className="text-gray-500 dark:text-gray-400 text-lg font-semibold mb-2">No hay novedades aún</p>
+          <p className="text-sm text-gray-400">¡Crea tu primera publicación, evento o cumpleaños para comenzar!</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {(feedMode === 'feed'
-            ? localPosts.slice().sort((a, b) => b.likes.length - a.likes.length)
-            : localPosts.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          ).map(post => (
-            <PostCard
-              key={post.id}
-              post={post}
-              onDeleted={() => {
-                setLocalPosts((prev) => prev.filter((p) => p.id !== post.id));
-              }}
-            />
-          ))}
+          {sortedFeed.map((item) => {
+            if (item.type === 'post' && 'post' in item) {
+              return <PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} />;
+            }
+            if (item.type === 'event' && 'event' in item) {
+              return <EventoCulturalCard key={item.event.id} event={{
+                id: item.event.id,
+                titulo: item.event.title,
+                descripcion: item.event.description,
+                fecha_inicio: item.event.date,
+                ubicacion: item.event.location || '',
+                imagen_url: item.event.imagen_url,
+                categoria: '',
+                tipo: item.event.type,
+                userId: item.event.userId,
+                metadata: {
+                  target_audience: item.event.metadata?.target_audience as any || '',
+                  responsible_person: item.event.metadata?.responsible_person || { name: '', phone: '' },
+                  technical_requirements: item.event.metadata?.technical_requirements || [],
+                  tags: item.event.metadata?.tags || [],
+                }
+              }} onEdit={() => setEditingEvent(item.event)} onDeleted={() => setLocalEvents((prev) => prev.filter((e) => e.id !== item.event.id))} />;
+            }
+            if (item.type === 'birthday' && 'birthday' in item) {
+              return <div key={item.birthday.id} className="card">Cumpleaños: {item.birthday.name}</div>;
+            }
+            return null;
+          })}
         </div>
       )}
     </div>

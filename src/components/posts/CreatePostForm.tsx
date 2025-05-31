@@ -164,47 +164,22 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
                 className="avatar-img"
               />
             </div>
-            <div className="flex-1">
-              {/* Previsualización de archivos multimedia */}
-              {previewUrl && postType === 'image' && (
-                <div className="mt-2 relative rounded-lg overflow-hidden">
-                  <img 
-                    src={previewUrl} 
-                    alt="Previsualización" 
-                    className="w-full h-auto max-h-[300px] object-cover rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => { setPreviewUrl(null); setMediaUrl(''); }}
-                    className="absolute top-2 right-2 bg-gray-900/70 text-white p-1 rounded-full"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-              {mediaUrl && postType === 'video' && (
-                <div className="mt-2">
-                  <video src={mediaUrl} controls className="w-full max-h-[300px] rounded-lg" />
-                </div>
-              )}
-              {audioPreviewUrl && postType === 'audio' && !isSubmitting && (
-                <div className="mt-2 flex flex-col items-start">
-                  <audio src={audioPreviewUrl} controls className="w-full" />
-                </div>
-              )}
-              {mediaUrl && postType === 'audio' && (
-                <div className="mt-2">
-                  <audio src={mediaUrl} controls className="w-full" />
-                </div>
-              )}
-              {mediaUrl && postType === 'document' && (
-                <div className="mt-2">
-                  <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Ver documento</a>
-                </div>
-              )}
-            </div>
+            <textarea
+              placeholder="¿Qué está pasando?"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="flex-1 p-4 text-lg text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm resize-none min-h-[48px] max-h-[160px] transition-all placeholder-gray-400 dark:placeholder-gray-500"
+              rows={2}
+              aria-label="Contenido de la publicación"
+              required={!mediaUrl}
+              disabled={isSubmitting}
+              style={{height: 'auto', boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)'}}
+              onInput={e => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = target.scrollHeight + 'px';
+              }}
+            />
           </div>
         </div>
         {/* Barra inferior tipo Telegram */}
@@ -229,25 +204,8 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
           >
             <FileText className="h-5 w-5" />
           </button>
-          {/* Textarea tipo Telegram */}
-          <div className="flex-1 mx-1 relative">
-            <textarea
-              placeholder="¿Qué está pasando?"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full p-4 text-lg text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm resize-none min-h-[48px] max-h-[160px] transition-all placeholder-gray-400 dark:placeholder-gray-500"
-              rows={2}
-              aria-label="Contenido de la publicación"
-              required={!mediaUrl}
-              disabled={isSubmitting}
-              style={{height: 'auto', boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)'}}
-              onInput={e => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = 'auto';
-                target.style.height = target.scrollHeight + 'px';
-              }}
-            />
-          </div>
+          {/* Espacio flexible para empujar los botones a la derecha */}
+          <div className="flex-1" />
           {/* Botón micrófono o enviar, cambia según contenido */}
           {content.trim() || mediaUrl ? (
             <button 

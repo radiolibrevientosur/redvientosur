@@ -306,9 +306,9 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" onClick={() => setShowAttachModal(false)}>&times;</button>
               <h3 className="text-lg font-bold mb-2">¿Qué quieres adjuntar?</h3>
               <div className="flex flex-col gap-3 w-full">
-                <button type="button" className="btn btn-primary w-full flex items-center gap-2 justify-center" onClick={() => handleAttachType('media')}><Image className="h-5 w-5" /> Foto/Video</button>
-                <button type="button" className="btn btn-accent w-full flex items-center gap-2 justify-center" onClick={() => handleAttachType('music')}><Music className="h-5 w-5" /> Música</button>
-                <button type="button" className="btn btn-secondary w-full flex items-center gap-2 justify-center" onClick={() => handleAttachType('document')}><FileText className="h-5 w-5" /> Documento</button>
+                <button type="button" className="w-full flex items-center gap-2 justify-center rounded-full py-2 text-base font-semibold bg-white dark:bg-gray-800 border border-primary-200 dark:border-gray-700 shadow-sm hover:bg-primary-50 dark:hover:bg-gray-700 transition-colors text-primary-700 dark:text-primary-200" onClick={() => handleAttachType('media')}><Image className="h-5 w-5" /> Foto/Video</button>
+                <button type="button" className="w-full flex items-center gap-2 justify-center rounded-full py-2 text-base font-semibold bg-white dark:bg-gray-800 border border-primary-200 dark:border-gray-700 shadow-sm hover:bg-primary-50 dark:hover:bg-gray-700 transition-colors text-primary-700 dark:text-primary-200" onClick={() => handleAttachType('music')}><Music className="h-5 w-5" /> Música</button>
+                <button type="button" className="w-full flex items-center gap-2 justify-center rounded-full py-2 text-base font-semibold bg-white dark:bg-gray-800 border border-primary-200 dark:border-gray-700 shadow-sm hover:bg-primary-50 dark:hover:bg-gray-700 transition-colors text-primary-700 dark:text-primary-200" onClick={() => handleAttachType('document')}><FileText className="h-5 w-5" /> Documento</button>
               </div>
               {/* Input file oculto, cambia accept según tipo */}
               <input

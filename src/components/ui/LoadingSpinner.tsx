@@ -9,7 +9,7 @@ interface LoadingSpinnerProps {
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
   size = 'md', 
   fullScreen = false,
-  message = 'Loading...'
+  message = 'Cargando...'
 }) => {
   const sizeMap = {
     sm: 'h-8 w-8',

@@ -227,7 +227,16 @@ const StoriesPage: React.FC = () => {
             {createMode === 'menu' && (
               <div className="flex flex-col gap-4 w-full">
                 <button type="button" className="btn btn-primary w-full rounded-full py-2 text-base font-semibold" onClick={() => setCreateMode('text')}>Historia de texto</button>
-                <button type="button" className="btn btn-accent w-full rounded-full py-2 text-base font-semibold" onClick={() => setCreateMode('photo')}>Historia de foto</button>
+                <button
+                  type="button"
+                  className="btn btn-accent w-full rounded-full py-2 text-base font-semibold"
+                  onClick={() => {
+                    setCreateMode('photo');
+                    setTimeout(() => fileInputRef.current?.click(), 100);
+                  }}
+                >
+                  Historia de foto
+                </button>
               </div>
             )}
             {createMode === 'text' && (
@@ -270,11 +279,12 @@ const StoriesPage: React.FC = () => {
                     onChange={e => setNewStoryImage(e.target.files?.[0] || null)}
                     className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
                     required
+                    style={{ display: 'none' }}
                   />
+                  {newStoryImage && (
+                    <img src={URL.createObjectURL(newStoryImage)} alt="Vista previa" className="w-full h-48 object-cover rounded-lg border" />
+                  )}
                 </label>
-                {newStoryImage && (
-                  <img src={URL.createObjectURL(newStoryImage)} alt="Vista previa" className="w-full h-48 object-cover rounded-lg border" />
-                )}
                 <textarea
                   className="w-full rounded border p-2 text-sm focus:ring-2 focus:ring-primary-500"
                   placeholder="Texto opcional (máx. 180 caracteres)"
@@ -299,21 +309,20 @@ const StoriesPage: React.FC = () => {
         <div className="flex overflow-x-auto space-x-4 px-4 py-2 hide-scrollbar w-full">
           <motion.div
             whileTap={{ scale: 0.95 }}
-            className="flex flex-col items-center min-w-[80px]"
+            className="flex flex-col items-center min-w-[80px] group cursor-pointer"
             onClick={() => setShowCreateModal(true)}
-            style={{ cursor: 'pointer' }}
           >
-            <div className="w-16 h-16 rounded-full border-2 border-dashed border-primary-500 flex items-center justify-center bg-primary-50 dark:bg-primary-900/20 relative group transition-all duration-200 hover:shadow-lg hover:scale-105">
+            <div className="w-16 h-16 rounded-full border-2 border-dashed border-primary-500 flex items-center justify-center bg-gradient-to-br from-primary-100 via-primary-50 to-white dark:from-primary-900/40 dark:via-primary-900/10 dark:to-gray-900 relative group transition-all duration-200 shadow-md hover:shadow-xl hover:scale-105 ring-2 ring-primary-200 dark:ring-primary-900/40">
               {user && user.avatar ? (
                 <img
                   src={user.avatar}
                   alt="Tu avatar"
-                  className="w-14 h-14 rounded-full object-cover absolute top-1 left-1 z-10 border-2 border-white dark:border-gray-900 group-hover:ring-2 group-hover:ring-primary-400"
+                  className="w-14 h-14 rounded-full object-cover absolute top-1 left-1 z-10 border-2 border-white dark:border-gray-900 group-hover:ring-2 group-hover:ring-primary-400 shadow-lg"
                 />
               ) : null}
-              <PlusCircle className="h-8 w-8 text-primary-500 z-20 group-hover:text-accent-500 transition-colors" />
+              <PlusCircle className="h-8 w-8 text-primary-500 z-20 group-hover:text-accent-500 transition-colors drop-shadow-lg" />
             </div>
-            <span className="text-xs mt-1 text-gray-600 dark:text-gray-400 font-semibold group-hover:text-primary-600">Crear</span>
+            <span className="text-xs mt-1 text-gray-700 dark:text-gray-300 font-bold group-hover:text-primary-600 tracking-wide uppercase letter-spacing-wider transition-colors">Crear</span>
           </motion.div>
           {stories.map((story, index) => (
             <motion.div

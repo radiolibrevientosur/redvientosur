@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlusCircle, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
@@ -209,11 +208,7 @@ const StoriesPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="py-8 flex justify-center">
-        <LoadingSpinner message="Cargando stories..." />
-      </div>
-    );
+    return null;
   }
   
   return (

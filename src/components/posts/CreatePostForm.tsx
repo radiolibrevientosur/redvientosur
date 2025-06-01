@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { FileText, Mic, Send, Camera } from 'lucide-react';
+import { FileText, Mic, Send, Camera, Paperclip, Image, Music } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { PostType, usePostStore } from '../../store/postStore';
 import { toast } from 'sonner';
@@ -25,6 +25,9 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const [showAudioRecorder, setShowAudioRecorder] = useState(false);
   const [showVideoRecorder, setShowVideoRecorder] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [attachType, setAttachType] = useState<'media' | 'music' | 'document' | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { user } = useAuthStore();
   const { addPost } = usePostStore();
@@ -135,6 +138,26 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     setShowEmojiPicker(false);
   };
 
+  // Nuevo handler para adjuntar
+  const handleAttachClick = () => {
+    setShowAttachModal(true);
+    setAttachType(null);
+  };
+  const handleAttachType = (type: 'media' | 'music' | 'document') => {
+    setAttachType(type);
+    setTimeout(() => fileInputRef.current?.click(), 200);
+  };
+  const handleAttachFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Subir archivo y obtener URL usando FileUploadWithPreview
+    // Simulamos subida directa y obtenemos URL local para previsualización
+    const url = URL.createObjectURL(file);
+    handleFileSelect(url);
+    setShowAttachModal(false);
+    setAttachType(null);
+  };
+
   return (
     <div className="feed-item mb-4">
       <form onSubmit={handleSubmit}>
@@ -178,15 +201,15 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
           >
             <span role="img" aria-label="emoji">😊</span>
           </button>
-          {/* Botón clip para archivos: debe estar visible directamente, sin desplegar otro botón */}
+          {/* Botón clip para archivos: ahora abre modal de opciones */}
           <button
             type="button"
             className="p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 mr-1"
-            onClick={() => { setShowFileUpload((v) => !v); setShowAudioRecorder(false); setShowVideoRecorder(false); }}
+            onClick={handleAttachClick}
             aria-label="Adjuntar archivo"
             disabled={isSubmitting}
           >
-            <FileText className="h-5 w-5" />
+            <Paperclip className="h-5 w-5" />
           </button>
           {/* Espacio flexible para empujar los botones a la derecha */}
           <div className="flex-1" />
@@ -274,6 +297,28 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
             className="fixed left-12 bottom-8 z-50 animate-slide-down shadow-2xl rounded-2xl bg-white dark:bg-gray-900 border border-primary-200 dark:border-primary-700"
           >
             <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />
+          </div>
+        )}
+        {/* Modal de adjuntar */}
+        {showAttachModal && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-6 w-full max-w-xs flex flex-col items-center gap-4 relative">
+              <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" onClick={() => setShowAttachModal(false)}>&times;</button>
+              <h3 className="text-lg font-bold mb-2">¿Qué quieres adjuntar?</h3>
+              <div className="flex flex-col gap-3 w-full">
+                <button type="button" className="btn btn-primary w-full flex items-center gap-2 justify-center" onClick={() => handleAttachType('media')}><Image className="h-5 w-5" /> Foto/Video</button>
+                <button type="button" className="btn btn-accent w-full flex items-center gap-2 justify-center" onClick={() => handleAttachType('music')}><Music className="h-5 w-5" /> Música</button>
+                <button type="button" className="btn btn-secondary w-full flex items-center gap-2 justify-center" onClick={() => handleAttachType('document')}><FileText className="h-5 w-5" /> Documento</button>
+              </div>
+              {/* Input file oculto, cambia accept según tipo */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={attachType === 'media' ? 'image/*,video/*' : attachType === 'music' ? 'audio/*' : attachType === 'document' ? '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.csv' : '*/*'}
+                style={{ display: 'none' }}
+                onChange={handleAttachFile}
+              />
+            </div>
           </div>
         )}
       </form>

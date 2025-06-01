@@ -295,7 +295,7 @@ const StoriesPage: React.FC = () => {
       )}
 
       {/* Story Circles */}
-      <div className="pt-2 pb-2 bg-gradient-to-r from-primary-50 via-white to-primary-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 rounded-xl shadow flex items-center mx-auto max-w-2xl border border-primary-100 dark:border-gray-800">
+      <div className="pt-2 pb-2 rounded-xl shadow flex items-center mx-auto max-w-2xl border border-primary-100 dark:border-gray-800 bg-white dark:bg-gray-900">
         <div className="flex overflow-x-auto space-x-4 px-4 py-2 hide-scrollbar w-full">
           <motion.div
             whileTap={{ scale: 0.95 }}

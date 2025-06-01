@@ -159,7 +159,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   };
 
   return (
-    <div className="feed-item mb-4">
+    <div className="feed-item mb-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm">
       <form onSubmit={handleSubmit}>
         {/* Contenido superior (avatar y preview) */}
         <div className="p-4 pb-2">
@@ -175,7 +175,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               placeholder={`Hola ${user?.displayName || ''} ¿Qué está pasando?`}
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="flex-1 p-4 text-lg text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm resize-none min-h-[48px] max-h-[160px] transition-all placeholder-gray-400 dark:placeholder-gray-500"
+              className="flex-1 p-4 text-lg text-gray-900 dark:text-white bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm resize-none min-h-[48px] max-h-[160px] transition-all placeholder-gray-400 dark:placeholder-gray-500"
               rows={2}
               aria-label="Contenido de la publicación"
               required={!mediaUrl}

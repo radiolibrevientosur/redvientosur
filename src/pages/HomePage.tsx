@@ -7,6 +7,8 @@ import { useEventStore } from '../store/eventStore';
 import EventoCulturalCard from '../components/cultural/EventoCulturalCard';
 import CreateEventForm from '../components/calendar/CreateEventForm';
 import { Event } from '../store/eventStore';
+import CumpleañosCard from '../components/cultural/CumpleañosCard';
+import { supabase } from '../lib/supabase';
 
 const FEED_MODES = [
   { label: 'Para ti', value: 'feed' },
@@ -21,6 +23,9 @@ const HomePage = () => {
   // Estados locales para manipulación inmediata de UI
   const [localPosts, setLocalPosts] = useState(posts);
   const [localEvents, setLocalEvents] = useState(events);
+  const [detailModal, setDetailModal] = useState<null | { type: 'post' | 'event' | 'birthday', id: string }>(null);
+  const [modalData, setModalData] = useState<any>(null);
+  const [modalLoading, setModalLoading] = useState(false);
 
   useEffect(() => {
     setLocalPosts(posts);
@@ -33,6 +38,41 @@ const HomePage = () => {
     fetchPosts();
     fetchEvents();
   }, [fetchPosts, fetchEvents]);
+
+  useEffect(() => {
+    if (!detailModal) return;
+    setModalLoading(true);
+    if (detailModal.type === 'post') {
+      supabase.from('posts').select('*').eq('id', detailModal.id).single().then(({ data }) => {
+        if (data) {
+          setModalData({
+            id: data.id,
+            userId: data.autor_id,
+            type: data.tipo,
+            content: data.contenido,
+            mediaUrl: Array.isArray(data.multimedia_url) ? data.multimedia_url[0] : undefined,
+            createdAt: data.creado_en,
+            likes: Array.isArray(data.likes) ? data.likes : [],
+            comments: Array.isArray(data.comments) ? data.comments : [],
+            isFavorite: !!data.isFavorite
+          });
+        } else {
+          setModalData(null);
+        }
+        setModalLoading(false);
+      });
+    } else if (detailModal.type === 'event') {
+      supabase.from('eventos').select('*').eq('id', detailModal.id).single().then(({ data }) => {
+        setModalData(data);
+        setModalLoading(false);
+      });
+    } else if (detailModal.type === 'birthday') {
+      supabase.from('cumpleanos').select('*').eq('id', detailModal.id).single().then(({ data }) => {
+        setModalData(data);
+        setModalLoading(false);
+      });
+    }
+  }, [detailModal]);
 
   // Simulación de cumpleaños (puedes reemplazar por tu fuente real)
   const [localBirthdays] = useState<any[]>([
@@ -77,6 +117,33 @@ const HomePage = () => {
 
   return (
     <div className="space-y-4">
+      {/* Modal de detalle unificado */}
+      {detailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-4 w-full max-w-2xl relative overflow-y-auto max-h-[90vh]">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 text-2xl"
+              onClick={() => { setDetailModal(null); setModalData(null); }}
+              aria-label="Cerrar detalle"
+            >✕</button>
+            {modalLoading ? (
+              <div className="p-8 text-center">Cargando...</div>
+            ) : detailModal.type === 'post' && modalData ? (
+              <div className="max-w-xl mx-auto p-4">
+                <PostCard post={modalData} disableCardNavigation onDeleted={() => { setDetailModal(null); setModalData(null); }} />
+              </div>
+            ) : detailModal.type === 'event' && modalData ? (
+              <div className="max-w-xl mx-auto p-4">
+                <EventoCulturalCard event={modalData} disableCardNavigation onDeleted={() => { setDetailModal(null); setModalData(null); }} />
+              </div>
+            ) : detailModal.type === 'birthday' && modalData ? (
+              <div className="max-w-xl mx-auto p-4">
+                <CumpleañosCard birthday={modalData} onDeleted={() => { setDetailModal(null); setModalData(null); }} />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
       <CreatePostForm onSuccess={() => {
         setTimeout(() => {
           const firstPost = document.querySelector('.feed-item');
@@ -158,7 +225,7 @@ const HomePage = () => {
         <div className="space-y-4">
           {sortedFeed.map((item) => {
             if (item.type === 'post' && 'post' in item) {
-              return <PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} />;
+              return <PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} onShowDetail={() => setDetailModal({ type: 'post', id: item.post.id })} />;
             }
             if (item.type === 'event' && 'event' in item) {
               return <EventoCulturalCard key={item.event.id} event={{
@@ -177,10 +244,10 @@ const HomePage = () => {
                   technical_requirements: item.event.metadata?.technical_requirements || [],
                   tags: item.event.metadata?.tags || [],
                 }
-              }} onEdit={() => setEditingEvent(item.event)} onDeleted={() => setLocalEvents((prev) => prev.filter((e) => e.id !== item.event.id))} />;
+              }} onEdit={() => setEditingEvent(item.event)} onDeleted={() => setLocalEvents((prev) => prev.filter((e) => e.id !== item.event.id))} onShowDetail={() => setDetailModal({ type: 'event', id: item.event.id })} />;
             }
             if (item.type === 'birthday' && 'birthday' in item) {
-              return <div key={item.birthday.id} className="card">Cumpleaños: {item.birthday.name}</div>;
+              return <CumpleañosCard key={item.birthday.id} birthday={item.birthday} onShowDetail={() => setDetailModal({ type: 'birthday', id: item.birthday.id })} />;
             }
             return null;
           })}

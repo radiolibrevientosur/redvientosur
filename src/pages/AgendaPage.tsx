@@ -132,21 +132,19 @@ const AgendaPage: React.FC = () => {
           <div className="space-y-6">
             {feed.map(item =>
               item.__type === 'cumple' ? (
-                <div className="shadow-lg rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-0">
+                <div className="shadow-lg rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-0" key={item.id}>
                   <CumpleañosCard
-                    key={item.id}
                     birthday={item}
                     onDeleted={() => setCumpleanos(prev => prev.filter(c => c.id !== item.id))}
                     onEdit={handleCumpleEdited}
                   />
                 </div>
               ) : (
-                <div className="shadow-lg rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-0">
+                <div className="shadow-lg rounded-xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 p-0" key={item.id}>
                   <EventoCulturalCard
-                    key={item.id}
                     event={item}
                     onDeleted={() => setEventos(prev => prev.filter(e => e.id !== item.id))}
-                    onEdit={handleEventoEdited}
+                    onEdit={() => handleEventoEdited(item)}
                   />
                 </div>
               )

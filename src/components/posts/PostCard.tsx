@@ -12,12 +12,11 @@ interface PostCardProps {
   post: Post;
   disableCardNavigation?: boolean;
   onDeleted?: () => void;
-  onShowDetail?: () => void;
 }
 
 const urlRegex = /(https?:\/\/[\w\-\.\/?#&=;%+~]+)|(www\.[\w\-\.\/?#&=;%+~]+)/gi;
 
-const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDeleted, onShowDetail }) => {
+const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDeleted }) => {
   const [isCommentExpanded, setIsCommentExpanded] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [postUser, setPostUser] = useState<any>(null);
@@ -36,11 +35,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     let isMounted = true;
     setLoadingUser(true);
     (async () => {
-      if (!post.userId) {
-        setPostUser(null);
-        setLoadingUser(false);
-        return;
-      }
       const u = await getUserById(post.userId);
       if (isMounted) {
         setPostUser(u);
@@ -55,9 +49,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     let isMounted = true;
     setLoadingComments(true);
     (async () => {
-      const commentsArr = Array.isArray(post.comments) ? post.comments : [];
-      // Filtra ids válidos
-      const ids = Array.from(new Set(commentsArr.map(c => c.userId).filter(Boolean)));
+      const ids = Array.from(new Set(post.comments.map(c => c.userId)));
       const users: Record<string, any> = {};
       await Promise.all(ids.map(async (id) => {
         const u = await getUserById(id);
@@ -71,8 +63,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     return () => { isMounted = false; };
   }, [post.comments]);
 
-  // Asegura que post.likes es un array antes de usar includes
-  const isLiked = user ? Array.isArray(post.likes) && post.likes.includes(user.id) : false;
+  const isLiked = user ? post.likes.includes(user.id) : false;
   
   const handleLike = () => {
     if (user) {
@@ -86,8 +77,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       await addComment(post.id, user.id, commentText);
       setCommentText('');
       // Refrescar usuarios de comentarios tras agregar uno nuevo
-      const commentsArr = Array.isArray(post.comments) ? post.comments : [];
-      const ids = Array.from(new Set([...commentsArr.map(c => c.userId), user.id]));
+      const ids = Array.from(new Set([...post.comments.map(c => c.userId), user.id]));
       const users: Record<string, any> = {};
       await Promise.all(ids.map(async (id) => {
         const u = await getUserById(id);
@@ -197,15 +187,14 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
               {disableCardNavigation ? (
                 <span>{formatPostDate(post.createdAt)}</span>
               ) : (
-                <span
-                  className="hover:underline cursor-pointer"
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (onShowDetail) onShowDetail();
-                  }}
-                >
-                  {formatPostDate(post.createdAt)}
-                </span>
+                <Link to={`/posts/${post.id}`} className="hover:underline" onClick={e => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('[data-menu="post-menu"]')) {
+                    e.preventDefault();
+                  }
+                }}>
+                  <span>{formatPostDate(post.createdAt)}</span>
+                </Link>
               )}
             </p>
           </div>
@@ -325,7 +314,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
             <span className={`text-sm ${isLiked 
               ? 'text-red-500' 
               : 'text-gray-600 dark:text-gray-400 group-hover:text-red-500'}`}>
-              {Array.isArray(post.likes) ? post.likes.length : 0}
+              {post.likes.length}
             </span>
           </button>
           
@@ -361,11 +350,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       </div>
       
       {/* Comments */}
-      {((Array.isArray(post.comments) ? post.comments.length : 0) > 0 || isCommentExpanded) && (
+      {(post.comments.length > 0 || isCommentExpanded) && (
         <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl">
-          {(Array.isArray(post.comments) && post.comments.length > 0) && (
+          {post.comments.length > 0 && (
             <div className="mb-3 space-y-3">
-              {(Array.isArray(post.comments) ? post.comments : []).slice(0, isCommentExpanded ? undefined : 2).map(comment => {
+              {post.comments.slice(0, isCommentExpanded ? undefined : 2).map(comment => {
                 const commentUser = commentUsers[comment.userId];
                 return (
                   <div key={comment.id} className="flex space-x-2">
@@ -399,7 +388,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
                 );
               })}
               
-              {(Array.isArray(post.comments) && post.comments.length > 2 && !isCommentExpanded) && (
+              {post.comments.length > 2 && !isCommentExpanded && (
                 <button 
                   onClick={() => setIsCommentExpanded(true)}
                   className="text-sm text-primary-600 dark:text-primary-400 font-medium"

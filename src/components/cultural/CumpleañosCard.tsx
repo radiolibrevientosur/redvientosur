@@ -28,10 +28,9 @@ interface CumpleañosCardProps {
   };
   onEdit?: (cumpleActualizado: any) => void;
   onDeleted?: () => void;
-  onShowDetail?: () => void;
 }
 
-const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onDeleted, onShowDetail }) => {
+const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onDeleted }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
@@ -187,26 +186,13 @@ const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onD
           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
             <span className="flex items-center">
               <Cake className="h-4 w-4 mr-1 text-pink-500" />
-              {onShowDetail ? (
-                <span
-                  className="hover:underline text-pink-600 dark:text-pink-400 font-semibold cursor-pointer"
-                  title="Ver detalle del cumpleaños"
-                  onClick={e => {
-                    e.stopPropagation();
-                    onShowDetail();
-                  }}
-                >
-                  {format(new Date(birthday.fecha_nacimiento), 'dd MMMM', { locale: es })}
-                </span>
-              ) : (
-                <a
-                  href={`/cumpleanos/${birthday.id}`}
-                  className="hover:underline text-pink-600 dark:text-pink-400 font-semibold"
-                  title="Ver detalle del cumpleaños"
-                >
-                  {format(new Date(birthday.fecha_nacimiento), 'dd MMMM', { locale: es })}
-                </a>
-              )}
+              <a
+                href={`/cumpleanos/${birthday.id}`}
+                className="hover:underline text-pink-600 dark:text-pink-400 font-semibold"
+                title="Ver detalle del cumpleaños"
+              >
+                {format(new Date(birthday.fecha_nacimiento), 'dd MMMM', { locale: es })}
+              </a>
             </span>
           </div>
           {/* Campos opcionales para compatibilidad */}

@@ -44,6 +44,8 @@ const BlogsPage: React.FC = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const commentInputRef = React.useRef<HTMLInputElement>(null);
   const [isCommentExpanded, setIsCommentExpanded] = useState<Record<string, boolean>>({});
+  const [likedBlogs, setLikedBlogs] = useState<string[]>([]);
+  const [likeLoading, setLikeLoading] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBlogs = async () => {
@@ -98,6 +100,19 @@ const BlogsPage: React.FC = () => {
     };
     fetchBlogs();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    // Cargar blogs que el usuario ha dado like
+    (async () => {
+      const { data } = await supabase
+        .from('reacciones_blog')
+        .select('publicacion_id')
+        .eq('usuario_id', user.id)
+        .eq('tipo', 'like');
+      setLikedBlogs(data ? data.map((r: any) => r.publicacion_id) : []);
+    })();
+  }, [user]);
 
   const categories = ['Todos', 'Arte', 'Música', 'Cine', 'Danza', 'Literatura'];
 
@@ -177,6 +192,32 @@ const BlogsPage: React.FC = () => {
       navigator.clipboard.writeText(url);
       toast.success('¡Enlace copiado!');
     }
+  };
+
+  const handleLikeBlog = async (blogId: string) => {
+    if (!user) {
+      toast.error('Debes iniciar sesión para dar like');
+      return;
+    }
+    setLikeLoading(blogId);
+    const isLiked = likedBlogs.includes(blogId);
+    if (isLiked) {
+      await supabase
+        .from('reacciones_blog')
+        .delete()
+        .eq('publicacion_id', blogId)
+        .eq('usuario_id', user.id)
+        .eq('tipo', 'like');
+      setLikedBlogs(likedBlogs.filter(id => id !== blogId));
+      setBlogs(blogs => blogs.map(b => b.id === blogId ? { ...b, likesCount: (b.likesCount || 1) - 1 } : b));
+    } else {
+      await supabase
+        .from('reacciones_blog')
+        .insert({ publicacion_id: blogId, usuario_id: user.id, tipo: 'like' });
+      setLikedBlogs([...likedBlogs, blogId]);
+      setBlogs(blogs => blogs.map(b => b.id === blogId ? { ...b, likesCount: (b.likesCount || 0) + 1 } : b));
+    }
+    setLikeLoading(null);
   };
 
   if (isLoading) {
@@ -276,12 +317,13 @@ const BlogsPage: React.FC = () => {
                     </Link>
                     <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 gap-4">
                       <button
-                        className="flex items-center space-x-1 group"
-                        // Aquí podrías implementar el like real
-                        onClick={() => toast.info('Funcionalidad de like próximamente')}
+                        className={`flex items-center space-x-1 group ${likeLoading === blog.id ? 'opacity-60 pointer-events-none' : ''}`}
+                        onClick={() => handleLikeBlog(blog.id)}
+                        aria-pressed={likedBlogs.includes(blog.id)}
+                        title={likedBlogs.includes(blog.id) ? 'Quitar like' : 'Dar like'}
                       >
-                        <Heart className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-red-500" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-red-500">{blog.likesCount || 0}</span>
+                        <Heart className={`h-5 w-5 transition-colors duration-150 ${likedBlogs.includes(blog.id) ? 'text-red-500 fill-red-500' : 'text-gray-600 dark:text-gray-400 group-hover:text-red-500'}`} />
+                        <span className={`text-sm transition-colors duration-150 ${likedBlogs.includes(blog.id) ? 'text-red-500' : 'text-gray-600 dark:text-gray-400 group-hover:text-red-500'}`}>{blog.likesCount || 0}</span>
                       </button>
                       <button
                         className="flex items-center space-x-1 group"

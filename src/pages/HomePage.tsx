@@ -7,6 +7,7 @@ import { useEventStore } from '../store/eventStore';
 import EventoCulturalCard from '../components/cultural/EventoCulturalCard';
 import CreateEventForm from '../components/calendar/CreateEventForm';
 import { Event } from '../store/eventStore';
+import StoriesPage from './StoriesPage';
 
 const FEED_MODES = [
   { label: 'Para ti', value: 'feed' },
@@ -77,6 +78,8 @@ const HomePage = () => {
 
   return (
     <div className="space-y-4">
+      {/* Stories Circles en la parte superior */}
+      <StoriesPage />
       <CreatePostForm onSuccess={() => {
         setTimeout(() => {
           const firstPost = document.querySelector('.feed-item');

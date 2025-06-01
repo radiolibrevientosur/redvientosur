@@ -1,3 +1,4 @@
+/* Las siguientes directivas solo serán interpretadas si Tailwind está activo en el entorno de build. No afectan el CSS final si Tailwind no está presente. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

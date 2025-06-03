@@ -26,19 +26,27 @@ interface Message {
   } | null;
 }
 
+// NUEVO: Añadir soporte para grupos en la interfaz de conversaciones y mensajes
+// 1. Modificar la interfaz Conversation para soportar grupos
 interface Conversation {
-  user_id: string;
-  username: string;
-  avatar_url: string;
+  user_id?: string; // para 1 a 1
+  group_id?: string; // para grupos
+  username?: string; // para 1 a 1
+  group_name?: string; // para grupos
+  avatar_url?: string; // para 1 a 1
+  group_avatar_url?: string; // para grupos
   last_message: string;
   last_time: string;
   unread_count: number;
+  is_group?: boolean;
+  group_members?: Array<{ id: string; nombre_usuario: string; avatar_url: string }>;
 }
 
 export default function MessagesPage() {
   const { user } = useAuthStore();
   const [searchParams] = useSearchParams();
   const receiverId = searchParams.get('to');
+  const groupId = searchParams.get('group');
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,76 +63,194 @@ export default function MessagesPage() {
   const [showVideoRecorder, setShowVideoRecorder] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [messagesLimit, setMessagesLimit] = useState(30);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const [showChat, setShowChat] = useState(false);
+  const [showActionsModal, setShowActionsModal] = useState(false);
+  const isMobile = window.innerWidth < 768;
 
-  // Cargar conversaciones recientes
-  useEffect(() => {
+  // --- 
+  // NUEVO: Consulta real de grupos y miembros desde Supabase
+  // Cache global de usuarios para evitar consultas repetidas
+  const userCacheRef = React.useRef<{ [key: string]: { nombre_usuario: string; avatar_url: string } }>({});
+
+  const fetchConversations = async () => {
     if (!user) return;
     setConvLoading(true);
-    const fetchConversations = async () => {
-      const { data: allMsgs } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-      if (!allMsgs) {
-        setConversations([]);
-        setConvLoading(false);
-        return;
+    // 1. Mensajes 1 a 1
+    const { data: allMsgs } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+    // 2. Grupos donde el usuario es miembro
+    const { data: groupMembers } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('user_id', user.id);
+    const groupIds = groupMembers?.map(gm => gm.group_id) || [];
+    let groups: any[] = [];
+    if (groupIds.length > 0) {
+      const { data: groupData } = await supabase
+        .from('groups')
+        .select('id, name, avatar_url')
+        .in('id', groupIds);
+      groups = groupData || [];
+    }
+    // 3. Obtener miembros de cada grupo (máximo 10 por grupo para UI)
+    let groupMembersMap: Record<string, any[]> = {};
+    if (groupIds.length > 0) {
+      const { data: allGroupMembers } = await supabase
+        .from('group_members')
+        .select('group_id, user_id, usuarios(nombre_usuario, avatar_url)')
+        .in('group_id', groupIds);
+      if (allGroupMembers) {
+        for (const gm of allGroupMembers) {
+          if (!groupMembersMap[gm.group_id]) groupMembersMap[gm.group_id] = [];
+          groupMembersMap[gm.group_id].push({
+            id: gm.user_id,
+            nombre_usuario: gm.usuarios?.nombre_usuario || 'Usuario',
+            avatar_url: gm.usuarios?.avatar_url || '/default-avatar.png',
+          });
+        }
       }
-      const userMap: { [key: string]: Conversation } = {};
-      for (const msg of allMsgs) {
-        const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
-        if (!userMap[otherId]) {
-          const { data: userData } = await supabase.from('usuarios').select('nombre_usuario,avatar_url').eq('id', otherId).single();
-          userMap[otherId] = {
-            user_id: otherId,
-            username: userData?.nombre_usuario || 'Usuario',
-            avatar_url: userData?.avatar_url || '/default-avatar.png',
-            last_message: msg.content,
-            last_time: msg.created_at,
-            unread_count: 0,
-          };
-        }
-        if (new Date(msg.created_at) > new Date(userMap[otherId].last_time)) {
-          userMap[otherId].last_message = msg.content;
-          userMap[otherId].last_time = msg.created_at;
-        }
-        if (msg.receiver_id === user.id && !msg.read) {
-          userMap[otherId].unread_count += 1;
-        }
+    }
+    // 4. IDs únicos de usuarios involucrados en 1 a 1
+    const userIds = Array.from(new Set(allMsgs?.map(msg => (msg.sender_id === user.id ? msg.receiver_id : msg.sender_id))));
+    const uncachedIds = userIds.filter(id => !userCacheRef.current[id]);
+    if (uncachedIds.length > 0) {
+      const { data: users } = await supabase
+        .from('usuarios')
+        .select('id, nombre_usuario, avatar_url')
+        .in('id', uncachedIds);
+      if (users) {
+        users.forEach(u => {
+          userCacheRef.current[u.id] = { nombre_usuario: u.nombre_usuario, avatar_url: u.avatar_url };
+        });
       }
-      const convArr = Object.values(userMap).sort((a, b) => new Date(b.last_time).getTime() - new Date(a.last_time).getTime());
-      setConversations(convArr);
-      setConvLoading(false);
-    };
+    }
+    // 5. Construir el mapa de conversaciones 1 a 1
+    const userMap: { [key: string]: Conversation } = {};
+    for (const msg of allMsgs || []) {
+      const otherId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
+      if (!userMap[otherId]) {
+        const userData = userCacheRef.current[otherId] || {};
+        userMap[otherId] = {
+          user_id: otherId,
+          username: userData.nombre_usuario || 'Usuario',
+          avatar_url: userData.avatar_url || '/default-avatar.png',
+          last_message: msg.content,
+          last_time: msg.created_at,
+          unread_count: 0,
+          is_group: false
+        };
+      }
+      if (new Date(msg.created_at) > new Date(userMap[otherId].last_time)) {
+        userMap[otherId].last_message = msg.content;
+        userMap[otherId].last_time = msg.created_at;
+      }
+      if (msg.receiver_id === user.id && !msg.read) {
+        userMap[otherId].unread_count += 1;
+      }
+    }
+    // 6. Construir el array de conversaciones de grupo
+    const groupConvs: Conversation[] = groups.map(g => {
+      // Buscar el último mensaje del grupo
+      const groupMsgs = allMsgs?.filter(m => m.group_id === g.id) || [];
+      const lastMsg = groupMsgs.length > 0 ? groupMsgs[groupMsgs.length - 1] : null;
+      return {
+        group_id: g.id,
+        group_name: g.name,
+        group_avatar_url: g.avatar_url || '/default-group.png',
+        last_message: lastMsg ? lastMsg.content : 'Sin mensajes',
+        last_time: lastMsg ? lastMsg.created_at : '',
+        unread_count: groupMsgs.filter(m => !m.read && m.receiver_id === user.id).length,
+        is_group: true,
+        group_members: (groupMembersMap[g.id] || []).slice(0, 10),
+      };
+    });
+    // 7. Unir y ordenar todas las conversaciones
+    const convArr = [
+      ...Object.values(userMap),
+      ...groupConvs
+    ].sort((a, b) => new Date(b.last_time).getTime() - new Date(a.last_time).getTime());
+    setConversations(convArr);
+    setConvLoading(false);
+  };
+
+  // --- 
+  // 2. useEffect para cargar conversaciones recientes y suscribirse a cambios en tiempo real
+  useEffect(() => {
     fetchConversations();
+    // Suscripción realtime para conversaciones
+    if (!user) return;
+    const channel = supabase
+      .channel('conversations-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `or(sender_id.eq.${user.id},receiver_id.eq.${user.id})`
+      }, () => {
+        fetchConversations();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [user, messages]);
 
   // Cargar mensajes entre el usuario actual y el receptor
   useEffect(() => {
-    if (!user || !receiverId) return;
+    if (!user || (!receiverId && !groupId)) return;
     setLoading(true);
     const fetchMessages = async () => {
-      const { data } = await supabase
+      let query = supabase
         .from('messages')
         .select('*')
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true })
+        .limit(messagesLimit);
+      if (groupId) {
+        query = query.eq('group_id', groupId);
+      } else {
+        query = query.or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`);
+      }
+      const { data } = await query;
       setMessages(data || []);
       setLoading(false);
-      await supabase.from('messages')
-        .update({ read: true })
-        .eq('receiver_id', user.id)
-        .eq('sender_id', receiverId)
-        .eq('read', false);
+      setHasMoreMessages((data?.length || 0) === messagesLimit);
+      // Marcar como leídos (solo para 1 a 1)
+      if (!groupId) {
+        await supabase.from('messages')
+          .update({ read: true })
+          .eq('receiver_id', user.id)
+          .eq('sender_id', receiverId)
+          .eq('read', false);
+      }
     };
     fetchMessages();
-  }, [user, receiverId]);
+  }, [user, receiverId, groupId, messagesLimit]);
+
+  // Suscripción en tiempo real para nuevos mensajes
+  useEffect(() => {
+    if (!user || (!receiverId && !groupId)) return;
+    const channel = supabase
+      .channel('messages-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `or(and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id}),and(group_id.eq.${groupId}))`
+      }, (payload) => {
+        const newMsg = payload.new as Message;
+        setMessages((prev) => prev.some(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, receiverId, groupId]);
 
   // Enviar mensaje mejorado
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !receiverId || (!newMessage.trim() && !selectedFile && !audioUrl && !videoUrl && !sticker)) return;
+    if (!user || (!receiverId && !groupId) || (!newMessage.trim() && !selectedFile && !audioUrl && !videoUrl && !sticker)) return;
     let content = newMessage.trim();
     let file_url = null;
     let audio_url = null;
@@ -154,6 +280,7 @@ export default function MessagesPage() {
       sticker_url,
       read: false,
       reply_to: replyTo ? { id: replyTo.id, content: replyTo.content } : null,
+      group_id: groupId, // NUEVO: Incluir group_id si es un chat grupal
     });
     setNewMessage('');
     setSelectedFile(null);
@@ -165,7 +292,7 @@ export default function MessagesPage() {
     const { data } = await supabase
       .from('messages')
       .select('*')
-      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`)
+      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id}),and(group_id.eq.${groupId})`)
       .order('created_at', { ascending: true });
     setMessages(data || []);
   };
@@ -221,33 +348,60 @@ export default function MessagesPage() {
     setReplyTo(msg);
   };
 
+  // Handler para cargar más mensajes (paginación)
+  function handleLoadMoreMessages() {
+    setMessagesLimit((prev) => prev + 30);
+  }
+
+  useEffect(() => {
+    // Si cambia la conversación seleccionada en móvil, mostrar el chat
+    if (isMobile && (receiverId || groupId)) setShowChat(true);
+    if (isMobile && !receiverId && !groupId) setShowChat(false);
+  }, [receiverId, groupId]);
+
   if (!user) {
     return <div className="p-4">Inicia sesión para ver tus mensajes.</div>;
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 flex gap-8">
+    <div className="max-w-4xl mx-auto p-4 flex gap-8 md:flex-row flex-col">
       {/* Lista de conversaciones */}
-      <div className="w-1/3 border-r pr-4">
+      <div className={`md:w-1/3 border-r pr-4 md:block ${isMobile && showChat ? 'hidden' : 'block'} bg-white dark:bg-gray-900`}> 
         <h3 className="font-bold mb-4">Conversaciones</h3>
         {convLoading ? <div>Cargando...</div> : (
           <ul className="space-y-2">
             {conversations.map(conv => (
-              <li key={conv.user_id}>
+              <li key={conv.group_id || conv.user_id}>
                 <Link
-                  to={`?to=${conv.user_id}`}
-                  className={`flex items-center gap-3 p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-gray-800 ${receiverId === conv.user_id ? 'bg-primary-100 dark:bg-gray-900' : ''}`}
+                  to={conv.is_group ? `?group=${conv.group_id}` : `?to=${conv.user_id}`}
+                  className={`flex items-center gap-3 p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-gray-800 ${receiverId === conv.user_id || groupId === conv.group_id ? 'bg-primary-100 dark:bg-gray-900' : ''}`}
+                  onClick={() => { if (isMobile) setShowChat(true); }}
                 >
-                  <img src={conv.avatar_url} alt={conv.username} className="w-10 h-10 rounded-full" />
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">@{conv.username}</span>
-                      {conv.unread_count > 0 && (
-                        <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 ml-2">{conv.unread_count}</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-gray-500 truncate max-w-[180px]">{conv.last_message}</div>
-                  </div>
+                  {conv.is_group ? (
+                    <>
+                      <img src={conv.group_avatar_url || '/default-group.png'} alt={conv.group_name} className="w-10 h-10 rounded-full" />
+                      <div className="flex -space-x-2">
+                        {conv.group_members?.slice(0, 3).map(m => (
+                          <img key={m.id} src={m.avatar_url} alt={m.nombre_usuario} className="w-6 h-6 rounded-full border-2 border-white -ml-2" />
+                        ))}
+                        {conv.group_members && conv.group_members.length > 3 && (
+                          <span className="w-6 h-6 rounded-full bg-gray-300 text-xs flex items-center justify-center border-2 border-white -ml-2">+{conv.group_members.length - 3}</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium">{conv.group_name}</div>
+                        <div className="text-xs text-gray-500 truncate max-w-[180px]">{conv.last_message}</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <img src={conv.avatar_url} alt={conv.username} className="w-10 h-10 rounded-full" />
+                      <div className="flex-1">
+                        <div className="font-medium">@{conv.username}</div>
+                        <div className="text-xs text-gray-500 truncate max-w-[180px]">{conv.last_message}</div>
+                      </div>
+                    </>
+                  )}
                 </Link>
               </li>
             ))}
@@ -256,19 +410,35 @@ export default function MessagesPage() {
         )}
       </div>
       {/* Chat actual */}
-      <div className="flex-1">
-        {receiverId ? (
+      <div className={`flex-1 ${isMobile && !showChat ? 'hidden' : 'block'}`}> 
+        {(receiverId || groupId) ? (
           <>
+            {/* Botón volver en móvil */}
+            {isMobile && (
+              <button onClick={() => { window.history.replaceState(null, '', '/messages'); setShowChat(false); }} className="mb-2 btn btn-secondary btn-sm">← Volver</button>
+            )}
             {/* Cabecera del chat */}
             <div className="flex items-center gap-3 mb-2 p-2 bg-white dark:bg-gray-900 rounded-t-lg shadow-sm sticky top-0 z-10">
               {/* Avatar y nombre del receptor */}
-              {conversations.find(c => c.user_id === receiverId) && (
+              {conversations.find(c => c.user_id === receiverId || c.group_id === groupId) && (
                 <>
-                  <img src={conversations.find(c => c.user_id === receiverId)?.avatar_url || '/default-avatar.png'} alt="avatar" className="h-10 w-10 rounded-full" />
-                  <div>
-                    <div className="font-semibold">@{conversations.find(c => c.user_id === receiverId)?.username}</div>
-                    <div className="text-xs text-gray-400">En línea</div>
-                  </div>
+                  {groupId ? (
+                    <>
+                      <img src={conversations.find(c => c.group_id === groupId)?.group_avatar_url || '/default-group.png'} alt="avatar" className="h-10 w-10 rounded-full" />
+                      <div>
+                        <div className="font-semibold">{conversations.find(c => c.group_id === groupId)?.group_name}</div>
+                        <div className="text-xs text-gray-400">En línea</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <img src={conversations.find(c => c.user_id === receiverId)?.avatar_url || '/default-avatar.png'} alt="avatar" className="h-10 w-10 rounded-full" />
+                      <div>
+                        <div className="font-semibold">@{conversations.find(c => c.user_id === receiverId)?.username}</div>
+                        <div className="text-xs text-gray-400">En línea</div>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -347,6 +517,12 @@ export default function MessagesPage() {
                   </div>
                 ))
               )}
+              {/* PAGINACIÓN DE MENSAJES */}
+              {hasMoreMessages && (
+                <div className="flex justify-center mb-2">
+                  <button onClick={handleLoadMoreMessages} className="btn btn-secondary btn-xs">Cargar más mensajes</button>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
             {/* Campo de respuesta visual */}
@@ -360,11 +536,12 @@ export default function MessagesPage() {
             {/* Formulario de envío mejorado */}
             <form onSubmit={e => { handleSend(e); setReplyTo(null); }} className="flex flex-col gap-2">
               <div className="flex gap-2 items-center relative">
+                {/* Solo emoji y microfono visibles, el resto en modal */}
                 <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="btn btn-ghost p-2" aria-label="Emojis">
                   <Smile className="w-5 h-5" />
                 </button>
                 {showEmojiPicker && (
-                  <div className="absolute z-50 bottom-12 left-0">
+                  <div className="absolute z-50 bottom-12 left-0 emoji-picker">
                     <Picker data={data} onEmojiSelect={(emoji: any) => {
                       setNewMessage(prev => prev + (emoji.native || ''));
                       setShowEmojiPicker(false);
@@ -376,31 +553,43 @@ export default function MessagesPage() {
                   value={newMessage}
                   onChange={e => setNewMessage(e.target.value)}
                   placeholder="Escribe un mensaje..."
+                  onFocus={() => setShowActionsModal(false)}
                 />
-                <input
-                  type="file"
-                  onChange={e => setSelectedFile(e.target.files?.[0] || null)}
-                  className="hidden"
-                  id="file-input"
-                />
-                <label htmlFor="file-input" className="btn btn-ghost p-2" aria-label="Adjuntar archivo">📎</label>
-                <button type="button" className="btn btn-ghost p-2" aria-label="Grabar audio" onClick={() => setShowAudioRecorder(v => !v)}>
-                  <Mic className="w-5 h-5" />
+                {/* Si hay texto, mostrar botón enviar, si no, microfono */}
+                {newMessage.trim() ? (
+                  <button type="submit" className="btn btn-primary p-2 ml-1" aria-label="Enviar">
+                    Enviar
+                  </button>
+                ) : (
+                  <button type="button" className="btn btn-ghost p-2 ml-1" aria-label="Grabar audio" onClick={() => setShowAudioRecorder(v => !v)}>
+                    <Mic className="w-5 h-5" />
+                  </button>
+                )}
+                {/* Botón para abrir modal de acciones extra */}
+                <button type="button" className="btn btn-ghost p-2 ml-1" aria-label="Más acciones" onClick={() => setShowActionsModal(true)}>
+                  ⋮
                 </button>
-                <button type="button" className="btn btn-ghost p-2" aria-label="Grabar video" onClick={() => setShowVideoRecorder(v => !v)}>
-                  <Camera className="w-5 h-5" />
-                </button>
-                {/* Stickers: ejemplo simple */}
-                <button type="button" className="btn btn-ghost p-2" onClick={() => setSticker('/stickers/like.png')} aria-label="Sticker like">👍</button>
-                <button type="button" className="btn btn-ghost p-2" onClick={() => setSticker('/stickers/love.png')} aria-label="Sticker love">❤️</button>
               </div>
+              {/* Modal de acciones extra */}
+              {showActionsModal && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowActionsModal(false)}>
+                  <div className="bg-white dark:bg-gray-900 rounded-t-2xl p-4 w-full max-w-md mx-auto flex flex-col gap-3 animate-fadeInUp" onClick={e => e.stopPropagation()}>
+                    <label htmlFor="file-input" className="btn btn-ghost w-full" aria-label="Adjuntar archivo">📎 Adjuntar archivo</label>
+                    <button type="button" className="btn btn-ghost w-full" aria-label="Grabar video" onClick={() => { setShowVideoRecorder(v => !v); setShowActionsModal(false); }}>
+                      <Camera className="w-5 h-5 mr-2" /> Grabar video
+                    </button>
+                    <button type="button" className="btn btn-ghost w-full" onClick={() => { setSticker('/stickers/like.png'); setShowActionsModal(false); }} aria-label="Sticker like">👍 Enviar sticker</button>
+                    <button type="button" className="btn btn-ghost w-full" onClick={() => { setSticker('/stickers/love.png'); setShowActionsModal(false); }} aria-label="Sticker love">❤️ Enviar sticker</button>
+                    <button type="button" className="btn btn-secondary w-full mt-2" onClick={() => setShowActionsModal(false)}>Cerrar</button>
+                  </div>
+                </div>
+              )}
               {showAudioRecorder && (
                 <AudioRecorder onAudioReady={(url: string | null) => { setAudioUrl(url); setShowAudioRecorder(false); }} />
               )}
               {showVideoRecorder && (
                 <VideoRecorder onVideoReady={(url: string | null) => { setVideoUrl(url); setShowVideoRecorder(false); }} />
               )}
-              <button type="submit" className="btn btn-primary self-end">Enviar</button>
             </form>
           </>
         ) : (

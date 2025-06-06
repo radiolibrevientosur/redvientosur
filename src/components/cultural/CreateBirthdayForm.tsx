@@ -27,12 +27,25 @@ const CreateBirthdayForm: React.FC<CreateBirthdayFormProps> = ({ onSuccess, onCa
 
   // Si initialData existe, inicializar los estados con sus valores
   React.useEffect(() => {
-    if (initialData) {
+    async function fetchUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Buscar datos extendidos del usuario en la tabla usuarios
+        const { data: usuarioDb } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        setUsuario(usuarioDb || { id: user.id, nombre_completo: user.user_metadata?.nombre_completo || '', nombre_usuario: user.user_metadata?.nombre_usuario || '' });
+      }
+    }
+    if (!initialData) {
+      fetchUser();
+    } else {
       setNombre(initialData.nombre || '');
       setUsuario(initialData.usuario || null);
       setFechaNacimiento(initialData.fecha_nacimiento || '');
       setMensaje(initialData.mensaje || '');
-      // No se inicializa imagen (solo preview)
     }
   }, [initialData]);
 
@@ -44,6 +57,10 @@ const CreateBirthdayForm: React.FC<CreateBirthdayFormProps> = ({ onSuccess, onCa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!usuario?.id) {
+      toast.error('No se detectó el usuario autenticado. Por favor, inicia sesión nuevamente.');
+      return;
+    }
     setIsSubmitting(true);
     let imagen_url = '';
     try {

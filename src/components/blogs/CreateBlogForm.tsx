@@ -77,18 +77,53 @@ const CreateBlogForm: React.FC<CreateBlogFormProps> = ({ onSuccess }) => {
     }
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.from('publicaciones').insert({
-        autor_id: user.id,
+      // Verificar si el usuario existe en la tabla usuarios
+      const { data: existingUser, error: userError } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+      if (userError || !existingUser) {
+        // Intentar crear el usuario con los datos mínimos
+        await supabase.from('usuarios').insert([
+          {
+            id: user.id,
+            email: user.email,
+            nombre_usuario: user.username || user.email?.split('@')[0] || 'usuario',
+            nombre_completo: user.displayName || user.username || user.email || 'Usuario'
+          }
+        ]);
+      }
+      const blogData = {
         titulo: title.trim(),
         contenido: content.trim(),
         excerpt: excerpt.trim() || content.substring(0, 120),
-        imagen_portada: coverImage,
-        categoria: category,
-        publicado_en: new Date().toISOString(),
-        actualizado_en: new Date().toISOString(),
-        tipo: 'blog'
-      });
-      if (error) throw error;
+        imagen_portada: coverImage || null,
+        categoria: category || null,
+        tipo: 'blog',
+        autor_id: user.id
+      };
+      const { error } = await supabase.from('publicaciones').insert([blogData]);
+      if (error) {
+        if (error.code === '23505' || (error.message && error.message.includes('unique_blog_title_per_author'))) {
+          setErrorMsg('Ya existe un blog con este título. Cambia el título e inténtalo de nuevo.');
+          toast.error('Ya existe un blog con este título.');
+        } else if (error.code === '42501' || (error.message && error.message.toLowerCase().includes('row level security'))) {
+          setErrorMsg('No tienes permisos para crear este blog.');
+          toast.error('No tienes permisos para crear este blog.');
+        } else if (error.message && error.message.toLowerCase().includes('null value')) {
+          setErrorMsg('Faltan campos obligatorios. Revisa el formulario.');
+          toast.error('Faltan campos obligatorios.');
+        } else if (error.message && error.message.includes('foreign key constraint')) {
+          setErrorMsg('Tu perfil no está correctamente registrado. Intenta cerrar sesión y volver a entrar.');
+          toast.error('Tu perfil no está correctamente registrado.');
+        } else {
+          setErrorMsg(error.message || 'Error al publicar el blog');
+          toast.error(error.message || 'Error al publicar el blog');
+        }
+        setIsSubmitting(false);
+        return;
+      }
       toast.success('¡Blog publicado exitosamente!');
       setTitle('');
       setExcerpt('');

@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Search, ArrowLeft, Bell, Moon, Sun, MoreVertical } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import Modal from '../ui/Modal';
+import { UserSearch } from '../profile/UserSearch';
 
 const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuthStore();
+  const [showUserSearch, setShowUserSearch] = useState(false);
   
   const shouldShowBackButton = !['/'].includes(location.pathname);
   
@@ -87,10 +90,13 @@ const TopBar: React.FC = () => {
             <button
               className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
               aria-label="Buscar usuarios"
-              onClick={() => navigate('/buscar-usuarios')}
+              onClick={() => setShowUserSearch(true)}
             >
               <Search className="h-5 w-5" />
             </button>
+            <Modal open={showUserSearch} onClose={() => setShowUserSearch(false)}>
+              <UserSearch onSelectUser={() => setShowUserSearch(false)} />
+            </Modal>
             <button
               className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
               aria-label="Notificaciones"

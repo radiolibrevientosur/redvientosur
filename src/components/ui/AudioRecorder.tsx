@@ -20,6 +20,8 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
   const intervalId = useRef<NodeJS.Timeout | null>(null);
+  // Flag para controlar si se debe mostrar la previsualización
+  const showPreviewNext = useRef(false);
 
   // 1. Animación visual del botón de grabación
   // 2. Indicador de duración ya implementado
@@ -43,7 +45,12 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
       const blob = new Blob(audioChunks.current, { type: 'audio/webm' });
       setPendingBlob(blob);
       setAudioUrl(URL.createObjectURL(blob));
-      setShowCancelPrompt(true);
+      if (showPreviewNext.current) {
+        setShowCancelPrompt(true);
+      } else {
+        // Envío automático: llamar a confirmSend
+        confirmSend();
+      }
     };
     mediaRecorder.start();
     setRecording(true);
@@ -54,6 +61,17 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
     if (mediaRecorderRef.current && recording) {
       setRecording(false);
       if (intervalId.current) clearInterval(intervalId.current);
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(audioChunks.current, { type: 'audio/webm' });
+        setPendingBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        if (showPreviewNext.current) {
+          setShowCancelPrompt(true);
+        } else {
+          // Envío automático: llamar a confirmSend
+          confirmSend();
+        }
+      };
       mediaRecorderRef.current.stop();
     }
   };
@@ -152,6 +170,14 @@ const AudioRecorder = forwardRef<any, AudioRecorderProps>(({ onAudioReady, folde
     cancelRecording,
     isRecording: () => recording,
     isUploading: () => uploading,
+    showPreview: () => {
+      showPreviewNext.current = true;
+      if (recording) {
+        stopRecording();
+      } else if (pendingBlob || audioUrl) {
+        setShowCancelPrompt(true);
+      }
+    },
   }));
 
   return (

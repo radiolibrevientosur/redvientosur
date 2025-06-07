@@ -12,7 +12,7 @@ interface User {
 }
 
 interface UserSearchProps {
-  onSelectUser?: () => void;
+  onSelectUser?: (user: User) => void;
 }
 
 const highlight = (text: string, query: string) => {
@@ -90,9 +90,8 @@ const UserSearch = ({ onSelectUser }: UserSearchProps): JSX.Element => {
       e.preventDefault();
     } else if (e.key === 'Enter') {
       if (results[highlighted]) {
-        window.location.href = `/profile/${results[highlighted].nombre_usuario}`;
         setShowDropdown(false);
-        if (onSelectUser) onSelectUser();
+        if (onSelectUser) onSelectUser(results[highlighted]);
       }
     } else if (e.key === 'Escape') {
       setShowDropdown(false);
@@ -123,7 +122,10 @@ const UserSearch = ({ onSelectUser }: UserSearchProps): JSX.Element => {
             <div
               key={user.id}
               className={`flex items-center px-4 py-2 cursor-pointer hover:bg-primary-50 dark:hover:bg-gray-800 ${highlighted === idx ? 'bg-primary-100 dark:bg-gray-800' : ''}`}
-              onMouseDown={() => { window.location.href = `/profile/${user.nombre_usuario}`; setShowDropdown(false); if (onSelectUser) onSelectUser(); }}
+              onMouseDown={() => {
+                setShowDropdown(false);
+                if (onSelectUser) onSelectUser(user);
+              }}
               onMouseEnter={() => setHighlighted(idx)}
             >
               <img

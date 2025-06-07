@@ -413,9 +413,9 @@ const ProfileView: React.FC<ProfileViewProps> = ({ onEdit, userId, username }) =
               </button>
             )}
             <Link
-              to="/direct-messages"
+              to={`/direct-messages?to=${profileUser.id}&name=${encodeURIComponent(profileUser.nombre_completo || profileUser.nombre_usuario)}&avatar=${encodeURIComponent(profileUser.avatar_url || '/default-avatar.png')}`}
               className="btn btn-ghost text-sm flex items-center focus:outline-none focus:ring-2 focus:ring-primary-500"
-              aria-label={`Enviar mensaje a ${profileUser.displayName || profileUser.username}`}
+              aria-label={`Enviar mensaje a ${profileUser.nombre_completo || profileUser.nombre_usuario}`}
             >
               <MessageCircle className="h-4 w-4 mr-1" />Mensaje
             </Link>

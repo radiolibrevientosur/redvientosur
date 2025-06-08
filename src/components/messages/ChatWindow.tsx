@@ -23,6 +23,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [actionMenuMsgId, setActionMenuMsgId] = useState<string | null>(null);
+  const [reactions, setReactions] = useState<{ [msgId: string]: string }>({});
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
@@ -53,7 +56,17 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
       await sendMessage(otherUserId, audioUrl); // solo dos argumentos
       setAudioUrl(null);
     } else {
-      await sendMessage(otherUserId, input.trim());
+      // Si hay replyTo, incluirlo en el mensaje (solo frontend, no persistente en BD)
+      const msgContent = input.trim();
+      let msg: any = { sender_id: user?.id, receiver_id: otherUserId, content: msgContent, created_at: new Date().toISOString(), read: false };
+      if (replyTo) {
+        msg.reply_to = { id: replyTo.id, content: replyTo.content };
+      }
+      await sendMessage(otherUserId, msgContent); // solo texto a la BD
+      // Simular reply en frontend (agregar reply_to al último mensaje propio)
+      setTimeout(() => {
+        setReplyTo(null);
+      }, 100);
     }
     setInput('');
   };
@@ -63,12 +76,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
     setShowEmojiPicker(false);
   };
 
-  const handleAudioReady = (url: string | null) => {
+  const handleAudioReady = async (url: string | null) => {
     if (url) {
-      setAudioUrl(url);
+      await sendMessage(otherUserId, url); // Enviar la nota de voz automáticamente
+      setAudioUrl(null);
       setInput('');
     }
-    setShowAudioRecorder(false); // Solo cerrar el modal cuando el usuario decida (enviar o descartar)
+    setShowAudioRecorder(false);
   };
 
   const handleFileSelect = (type: 'media' | 'music' | 'doc') => {
@@ -157,19 +171,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
     setIsMicPressed(false);
     if (dragAction === 'left') {
       audioRecorderRef.current?.cancelRecording();
-    } else if (dragAction === 'up') {
-      // Solo mostrar previsualización si hay audio grabado
-      if (audioRecorderRef.current?.isRecording?.()) {
-        audioRecorderRef.current?.stopRecording();
-        setTimeout(() => {
-          if (audioRecorderRef.current?.showPreview) {
-            audioRecorderRef.current.showPreview();
-          }
-        }, 250);
-      } else if (audioRecorderRef.current?.showPreview) {
-        audioRecorderRef.current.showPreview();
-      }
     } else {
+      // Siempre enviar automáticamente al soltar (sin previsualización)
       audioRecorderRef.current?.stopRecording();
     }
     setDragAction('none');
@@ -183,15 +186,39 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
     micStartPos.current = null;
   };
 
+  // Handler para agregar reacción (solo frontend, demo)
+  const handleAddReaction = (msgId: string, emoji: string) => {
+    setReactions(prev => ({ ...prev, [msgId]: emoji }));
+    setActionMenuMsgId(null);
+  };
+
+  // Handler para responder
+  const handleReply = (msg: Message) => {
+    setReplyTo(msg);
+    setActionMenuMsgId(null);
+  };
+
+  // Handler para eliminar mensaje (solo si es propio)
+  const handleDelete = async (msg: Message) => {
+    if (msg.sender_id !== user?.id) return;
+    await supabase.from('messages').delete().eq('id', msg.id);
+    // Eliminar del frontend
+    if (Array.isArray(messages)) {
+      const idx = messages.findIndex(m => m.id === msg.id);
+      if (idx !== -1) messages.splice(idx, 1);
+    }
+    setActionMenuMsgId(null);
+  };
+
   return (
-    <div className="flex flex-col h-full border rounded shadow bg-white">
-      <div className="p-2 border-b font-semibold flex items-center gap-2">
+    <div className="flex flex-col h-full border rounded shadow bg-white max-w-full sm:max-w-md mx-auto w-full min-h-[80vh] sm:min-h-[500px] relative md:rounded-xl md:shadow-lg md:border md:bg-white">
+      <div className="p-2 border-b font-semibold flex items-center gap-2 bg-white sticky top-0 z-10 min-h-[48px] sm:min-h-[56px] md:rounded-t-xl">
         {otherUserAvatar && (
-          <img src={otherUserAvatar} alt={otherUserName || otherUserId} className="w-8 h-8 rounded-full" />
+          <img src={otherUserAvatar} alt={otherUserName || otherUserId} className="w-9 h-9 rounded-full object-cover" />
         )}
-        Chat con {otherUserName || otherUserId}
+        <span className="truncate text-base sm:text-lg">Chat con {otherUserName || otherUserId}</span>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-2 bg-gray-50 hide-scrollbar min-h-[60vh] max-h-[70vh] md:rounded-b-xl">
         {loading ? (
           <div>Cargando mensajes...</div>
         ) : (
@@ -211,20 +238,54 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
                 filePreview = <a href={url} target="_blank" rel="noopener noreferrer" className="block text-blue-200 underline break-all mb-1">Documento adjunto</a>;
               }
             }
+            const isOwn = msg.sender_id === user?.id;
             return (
-              <div
-                key={msg.id}
-                className={`max-w-xs px-3 py-2 rounded-lg text-sm shadow-md ${msg.sender_id === user?.id ? 'bg-blue-600 text-white ml-auto' : 'bg-gray-700 text-white mr-auto'}`}
-              >
-                {isFile ? filePreview : msg.content}
-                <div className="text-[10px] text-gray-300 text-right mt-1">{new Date(msg.created_at).toLocaleTimeString()}</div>
+              <div key={msg.id} className="relative group">
+                <div
+                  className={`max-w-xs px-3 py-2 rounded-lg text-sm shadow-md ${isOwn ? 'bg-blue-600 text-white ml-auto' : 'bg-gray-700 text-white mr-auto'}`}
+                  onContextMenu={e => { e.preventDefault(); setActionMenuMsgId(msg.id); }}
+                  onClick={() => setActionMenuMsgId(msg.id)}
+                  tabIndex={0}
+                  aria-label="Acciones de mensaje"
+                >
+                  {/* Si es respuesta */}
+                  {msg.reply_to && (
+                    <div className="text-xs text-blue-200 mb-1 border-l-2 border-blue-300 pl-2 italic">Respondiendo a: {msg.reply_to.content?.slice(0, 40)}...</div>
+                  )}
+                  {isFile ? filePreview : msg.content}
+                  {/* Reacciones visuales */}
+                  {reactions[msg.id] && (
+                    <div className="mt-1 flex items-center gap-1">
+                      <span className="bg-white/80 text-black rounded-full px-2 py-0.5 text-base border border-gray-200">{reactions[msg.id]}</span>
+                    </div>
+                  )}
+                  <div className="text-[10px] text-gray-300 text-right mt-1">{new Date(msg.created_at).toLocaleTimeString()}</div>
+                </div>
+                {/* Menú contextual de acciones rápidas */}
+                {actionMenuMsgId === msg.id && (
+                  <div className="absolute -top-14 right-0 bg-white dark:bg-gray-800 shadow-lg rounded-xl p-2 flex space-x-2 z-30 border animate-fade-in">
+                    <button onClick={() => handleAddReaction(msg.id, '👍')} className="p-1 rounded hover:bg-primary-100" title="Reaccionar">👍</button>
+                    <button onClick={() => handleAddReaction(msg.id, '😂')} className="p-1 rounded hover:bg-primary-100" title="Reaccionar">😂</button>
+                    <button onClick={() => handleAddReaction(msg.id, '❤️')} className="p-1 rounded hover:bg-primary-100" title="Reaccionar">❤️</button>
+                    <button onClick={() => handleReply(msg)} className="p-1 rounded hover:bg-primary-100" title="Responder">↩️</button>
+                    {isOwn && <button onClick={() => handleDelete(msg)} className="p-1 rounded hover:bg-red-100" title="Eliminar">🗑️</button>}
+                  </div>
+                )}
               </div>
             );
           })
         )}
         <div ref={messagesEndRef} />
       </div>
-      <form onSubmit={handleSend} className="p-2 border-t flex gap-2 items-center relative">
+      {/* Campo de respuesta visual */}
+      {replyTo && (
+        <div className="flex items-center gap-2 mb-2 bg-blue-50 rounded px-3 py-1">
+          <span className="text-xs truncate">Respondiendo a: {replyTo.content?.slice(0, 40)}...</span>
+          <button onClick={() => setReplyTo(null)} className="ml-auto text-gray-400 hover:text-red-500">✕</button>
+        </div>
+      )}
+      {/* ...existing code para el formulario de envío... */}
+      <form onSubmit={e => { handleSend(e); setReplyTo(null); }} className="p-2 border-t flex gap-2 items-center relative bg-white sticky bottom-0 z-20 md:rounded-b-xl">
         <input
           ref={fileInputRef}
           type="file"
@@ -286,7 +347,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
           </div>
         )}
         <input
-          className="flex-1 border rounded px-2 py-1 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-400"
+          className="flex-1 border rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-400 text-base md:text-lg"
           value={input}
           onChange={e => setInput(e.target.value)}
           placeholder="Escribe un mensaje..."
@@ -315,7 +376,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
           </div>
         )}
         {showAudioRecorder && (
-          <div className="absolute bottom-12 right-0 z-50 w-72 max-w-full">
+          <div className="absolute bottom-14 right-0 z-50 w-[98vw] max-w-xs sm:max-w-sm md:max-w-md">
             <AudioRecorder ref={audioRecorderRef} onAudioReady={handleAudioReady} folder="chat-audio" />
           </div>
         )}

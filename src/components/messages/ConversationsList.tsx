@@ -14,6 +14,7 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({ onSelectUs
   const { conversations, loading, fetchConversations } = useRecentConversations(user?.id || '');
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.id) fetchConversations();
@@ -23,12 +24,19 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({ onSelectUs
   const handleUserSearchSelect = (selectedUser: any) => {
     setShowModal(false);
     if (selectedUser) {
+      setSelectedConvId(selectedUser.id);
       onSelectUser(selectedUser.id, selectedUser.nombre_completo || selectedUser.nombre_usuario, selectedUser.avatar_url || '/default-avatar.png');
     }
   };
 
+  // Handler para seleccionar conversación de la lista
+  const handleSelectConv = (u: any) => {
+    setSelectedConvId(u.id);
+    onSelectUser(u.id, u.displayName, u.avatar);
+  };
+
   return (
-    <div>
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
       {/* Header con avatar, nombre y botón */}
       <div className="flex items-center justify-between p-4 border-b bg-white dark:bg-gray-900">
         <div className="flex items-center gap-2">
@@ -60,11 +68,20 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({ onSelectUs
         />
       </div>
       {/* Lista de conversaciones */}
-      <div className="divide-y">
+      <div className="flex-1 overflow-y-auto divide-y" style={{ minHeight: 0 }}>
         {loading ? (
           <div className="p-4">Cargando conversaciones...</div>
         ) : conversations.length === 0 ? (
-          <div className="p-4">No tienes conversaciones aún.</div>
+          <div className="flex flex-col items-center justify-center h-full p-8 gap-4" data-testid="no-conversations">
+            <span className="text-gray-400 text-center">No tienes conversaciones aún.</span>
+            <button
+              className="px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700 transition text-sm"
+              onClick={() => setShowModal(true)}
+              data-testid="start-conversation-btn"
+            >
+              Iniciar nueva conversación
+            </button>
+          </div>
         ) : (
           conversations
             .slice()
@@ -76,13 +93,16 @@ export const ConversationsList: React.FC<ConversationsListProps> = ({ onSelectUs
             .map((u) => (
               <div
                 key={u.id}
-                className="p-4 cursor-pointer hover:bg-gray-100 flex items-center"
-                onClick={() => onSelectUser(u.id, u.displayName, u.avatar)}
+                data-testid="conversation-item"
+                className={`p-4 cursor-pointer flex items-center gap-3 rounded-lg transition-all ${selectedConvId === u.id ? 'bg-primary-100 dark:bg-primary-900/30 border border-primary-400' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                onClick={() => handleSelectConv(u)}
+                tabIndex={0}
+                aria-label={`Conversación con ${u.displayName}`}
               >
-                <img src={u.avatar} alt={u.displayName} className="w-10 h-10 rounded-full mr-3" />
-                <div>
-                  <div className="font-semibold">{u.displayName}</div>
-                  <div className="text-xs text-gray-500">@{u.username}</div>
+                <img src={u.avatar} alt={u.displayName} className="w-10 h-10 rounded-full mr-1 object-cover" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold truncate">{u.displayName}</div>
+                  <div className="text-xs text-gray-500 truncate">@{u.username}</div>
                   <div className="text-xs text-gray-400 truncate max-w-[180px]">{u.lastMessage}</div>
                   <div className="text-[10px] text-gray-400">{new Date(u.lastTime).toLocaleString()}</div>
                 </div>

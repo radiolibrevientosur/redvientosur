@@ -9,6 +9,9 @@ export interface Message {
   content: string;
   created_at: string;
   read: boolean;
+  reply_to?: { id: string; content: string } | null; // Soporte para reply
+  // reacciones solo frontend, no persistente
+  // reactions?: { [emoji: string]: number };
 }
 
 export function useDirectMessages(currentUserId: string) {

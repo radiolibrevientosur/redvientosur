@@ -2,6 +2,7 @@ import { HiOutlineHome, HiOutlineUser, HiOutlineBell, HiOutlineChat } from 'reac
 import { FiLogOut } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { EventNote, CalendarToday, Article } from '@mui/icons-material';
 
 const menuItems = [
   { icon: <HiOutlineHome size={22} />, label: 'Inicio', path: '/' },
@@ -32,14 +33,25 @@ export default function LeftSidebar({ onOpenConversations }: LeftSidebarProps) {
   return (
     <div className="flex flex-col h-full p-4 gap-6 bg-white">
       {/* Logo */}
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-2xl font-bold text-blue-600">VientoSur</span>
-      </div>
+      {/* Se eliminó la palabra VientoSur */}
       {/* Menú */}
       <nav className="flex flex-col gap-2">
         <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-800 font-medium transition" onClick={() => navigate('/')}>{menuItems[0].icon}<span>{menuItems[0].label}</span></button>
         <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-800 font-medium transition" onClick={() => navigate('/profile')}>{menuItems[1].icon}<span>{menuItems[1].label}</span></button>
         <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-800 font-medium transition" onClick={onOpenConversations}>{menuItems[2].icon}<span>{menuItems[2].label}</span></button>
+        {/* Botones adicionales debajo de Mensajes */}
+        <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-800 font-medium transition" onClick={() => navigate('/agenda')}>
+          <EventNote fontSize="small" />
+          <span>Agenda</span>
+        </button>
+        <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-800 font-medium transition" onClick={() => navigate('/calendar')}>
+          <CalendarToday fontSize="small" />
+          <span>Calendario</span>
+        </button>
+        <button className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50 text-gray-800 font-medium transition" onClick={() => navigate('/blogs')}>
+          <Article fontSize="small" />
+          <span>Blogs</span>
+        </button>
       </nav>
       {/* Perfil */}
       <div className="rounded-lg shadow-md p-4 bg-white mb-2">

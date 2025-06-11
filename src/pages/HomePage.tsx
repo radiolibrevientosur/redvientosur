@@ -78,24 +78,26 @@ const HomePage = () => {
     : unifiedFeed.slice().sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
-    <div className="space-y-4 max-w-full sm:max-w-2xl mx-auto px-1 sm:px-0 pb-24">
+    <div className="space-y-4 w-full sm:max-w-2xl mx-auto pb-24">
       {/* Stories Circles en la parte superior */}
-      <div className="mb-2">
+      <div className="mb-2 w-full">
         <StoriesPage />
       </div>
       {/* Formulario para crear post */}
-      <CreatePostForm onSuccess={() => {
-        setTimeout(() => {
-          const firstPost = document.querySelector('.feed-item');
-          if (firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
-      }} />
+      <div className="w-full">
+        <CreatePostForm onSuccess={() => {
+          setTimeout(() => {
+            const firstPost = document.querySelector('.feed-item');
+            if (firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 100);
+        }} />
+      </div>
       {/* Sugerencias de perfiles a seguir debajo del textarea, solo móvil */}
-      <div className="block sm:hidden mb-2">
+      <div className="block sm:hidden mb-2 w-full">
         <SuggestionsToFollow />
       </div>
       {/* Sugerencias de perfiles a seguir en escritorio */}
-      <div className="hidden sm:block">
+      <div className="hidden sm:block w-full">
         <SuggestionsToFollow />
       </div>
       {/* Modal de edición de evento */}

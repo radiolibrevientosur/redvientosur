@@ -78,19 +78,22 @@ const HomePage = () => {
     : unifiedFeed.slice().sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
-    <div className="space-y-4 w-full sm:max-w-2xl mx-auto pb-24">
+    <div className="space-y-4 w-full pb-24">
       {/* Stories Circles en la parte superior */}
       <div className="mb-2 w-full">
         <StoriesPage />
       </div>
       {/* Formulario para crear post */}
       <div className="w-full">
-        <CreatePostForm onSuccess={() => {
-          setTimeout(() => {
-            const firstPost = document.querySelector('.feed-item');
-            if (firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 100);
-        }} />
+        <CreatePostForm 
+          className="rounded-none mx-0"
+          onSuccess={() => {
+            setTimeout(() => {
+              const firstPost = document.querySelector('.feed-item');
+              if (firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }} 
+        />
       </div>
       {/* Sugerencias de perfiles a seguir debajo del textarea, solo móvil */}
       <div className="block sm:hidden mb-2 w-full">
@@ -172,10 +175,10 @@ const HomePage = () => {
         <div className="space-y-2 sm:space-y-4">
           {sortedFeed.map((item) => {
             if (item.type === 'post' && 'post' in item) {
-              return <div className="feed-item"><PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} /></div>;
+              return <div className="feed-item rounded-none mx-0"><PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} /></div>;
             }
             if (item.type === 'event' && 'event' in item) {
-              return <div className="feed-item"><EventoCulturalCard key={item.event.id} event={{
+              return <div className="feed-item rounded-none mx-0"><EventoCulturalCard key={item.event.id} event={{
                 id: item.event.id,
                 titulo: item.event.title,
                 descripcion: item.event.description,
@@ -194,7 +197,7 @@ const HomePage = () => {
               }} onEdit={() => setEditingEvent(item.event)} onDeleted={() => setLocalEvents((prev) => prev.filter((e) => e.id !== item.event.id))} /></div>;
             }
             if (item.type === 'birthday' && 'birthday' in item) {
-              return <div key={item.birthday.id} className="card feed-item">Cumpleaños: {item.birthday.name}</div>;
+              return <div key={item.birthday.id} className="card feed-item rounded-none mx-0">Cumpleaños: {item.birthday.name}</div>;
             }
             return null;
           })}

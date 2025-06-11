@@ -84,14 +84,12 @@ const HomePage = () => {
         <StoriesPage />
       </div>
       {/* Formulario para crear post */}
-      <div className="rounded-lg bg-white dark:bg-gray-900 shadow-sm p-2 sm:p-4 mb-2">
-        <CreatePostForm onSuccess={() => {
-          setTimeout(() => {
-            const firstPost = document.querySelector('.feed-item');
-            if (firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }, 100);
-        }} />
-      </div>
+      <CreatePostForm onSuccess={() => {
+        setTimeout(() => {
+          const firstPost = document.querySelector('.feed-item');
+          if (firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      }} />
       {/* Sugerencias de perfiles a seguir debajo del textarea, solo móvil */}
       <div className="block sm:hidden mb-2">
         <SuggestionsToFollow />

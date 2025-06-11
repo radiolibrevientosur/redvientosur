@@ -16,23 +16,23 @@ const MainLayout: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header general visible en móvil y escritorio */}
       <Header />
-      <div className="flex flex-1 gap-0 sm:gap-2 md:gap-4 max-w-full mx-auto w-full overflow-x-hidden">
+      <div className="flex flex-1 gap-0 max-w-full mx-auto w-full overflow-x-hidden">
         {/* Sidebar izquierdo */}
         <aside
-          className={`fixed lg:static inset-y-0 left-0 z-30 transform ${leftOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-200 w-64 sm:w-72 md:w-80 bg-white dark:bg-gray-800 shadow-lg lg:shadow-none lg:w-1/4 hidden md:block lg:block`}
+          className={`fixed lg:static inset-y-0 left-0 z-30 transform ${leftOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-200 w-64 sm:w-72 md:w-80 bg-white dark:bg-gray-800 shadow-lg lg:shadow-none lg:w-[24%] hidden md:block lg:block`}
         >
           <LeftSidebar onOpenConversations={() => setShowConversations(true)} />
         </aside>
         {/* Contenido principal */}
-        <main className="flex-1 mx-auto max-w-full sm:max-w-2xl md:max-w-3xl p-2 sm:p-4 w-full bg-white dark:bg-gray-900 rounded-none sm:rounded-lg shadow-none sm:shadow-md lg:w-2/4 border-0 sm:border border-gray-100 dark:border-gray-800 min-h-[calc(100vh-56px)] overflow-y-auto">
+        <main className="flex-1 mx-auto max-w-full p-2 sm:p-4 w-full bg-white dark:bg-gray-900 rounded-none shadow-none border-0 min-h-[calc(100vh-56px)] overflow-y-auto lg:w-[52%]">
           <MainContent />
-          <div className="container mx-auto px-0 sm:px-4 py-2 max-w-full sm:max-w-2xl">
+          <div className="container mx-auto px-0 py-2 max-w-full">
             <Outlet />
           </div>
         </main>
         {/* Sidebar derecho */}
         <aside
-          className={`fixed lg:static inset-y-0 right-0 z-30 transform ${rightOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0 transition-transform duration-200 w-64 sm:w-72 md:w-80 bg-white dark:bg-gray-800 shadow-lg lg:shadow-none lg:w-1/4 hidden md:block lg:block`}
+          className={`fixed lg:static inset-y-0 right-0 z-30 transform ${rightOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0 transition-transform duration-200 w-64 sm:w-72 md:w-80 bg-white dark:bg-gray-800 shadow-lg lg:shadow-none lg:w-[24%] hidden md:block lg:block`}
         >
           <RightSidebar />
           <ConversationModal open={showConversations} onClose={() => setShowConversations(false)} />

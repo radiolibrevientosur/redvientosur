@@ -7,15 +7,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
-  build: {
-    rollupOptions: {
-      external: [
-        'swiper',
-        'swiper/react',
-        'swiper/css',
-        'swiper/css/navigation',
-        'swiper/css/pagination',
-      ],
-    },
-  },
 });

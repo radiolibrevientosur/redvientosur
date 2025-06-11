@@ -8,6 +8,11 @@ import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { Link } from 'react-router-dom';
 import ReactDOM from 'react-dom';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Pagination } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
 
 interface PostCardProps {
   post: Post;
@@ -277,56 +282,43 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
         </div>
       </div>
       
-      {/* Post Content */}
-      <div className="px-4 pb-3 pt-2">
-        <p className="mb-3 text-gray-900 dark:text-white text-base leading-relaxed whitespace-pre-line break-words">{post.content}</p>
-      </div>
-      
-      {/* Enlaces en el contenido del post */}
-      {post.content && post.content.match(urlRegex) && (
-        <div className="mb-3">
-          {post.content.match(urlRegex)?.map((url, idx) => (
-            <div key={idx} className="mb-2">
-              <a
-                href={url.startsWith('http') ? url : `https://${url}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-600 underline break-all"
-              >
-                {url}
-              </a>
-            </div>
-          ))}
-        </div>
-      )}
-      
       {/* Post Media */}
       {(Array.isArray((post as any).mediaUrls) && (post as any).mediaUrls.length > 0) ? (
-        <div className="relative pb-3 flex flex-wrap gap-2 justify-center">
-          {(post as any).mediaUrls.map((media: {url: string, type: string, name?: string}, idx: number) => (
-            <React.Fragment key={media.url}>
-              {media.type === 'image' && (
-                <img 
-                  src={media.url} 
-                  alt={`Imagen ${idx + 1}`} 
-                  className="rounded-xl border border-gray-200 dark:border-gray-800 w-auto max-w-[180px] max-h-[220px] object-contain shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
-                  onClick={() => { setLightboxIndex(idx); setLightboxOpen(true); }}
-                />
-              )}
-              {media.type === 'video' && (
-                <video src={media.url} controls className="rounded-xl border border-gray-200 dark:border-gray-800 w-auto max-w-[220px] max-h-[220px] object-contain shadow-sm" />
-              )}
-              {media.type === 'audio' && (
-                <audio src={media.url} controls className="w-full" />
-              )}
-              {media.type === 'document' && (
-                <div className="flex items-center">
-                  <a href={media.url} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Ver documento {media.name || ''}</a>
-                </div>
-              )}
-            </React.Fragment>
-          ))}
-
+        <div className="relative pb-3">
+          <Swiper
+            modules={[Navigation, Pagination]}
+            navigation
+            pagination={{ clickable: true }}
+            className="w-full h-full rounded-xl"
+            style={{ maxWidth: '100%', maxHeight: 360 }}
+          >
+            {(post as any).mediaUrls.map((media: {url: string, type: string, name?: string}, idx: number) => (
+              media.type === 'image' ? (
+                <SwiperSlide key={media.url}>
+                  <img
+                    src={media.url}
+                    alt={`Imagen ${idx + 1}`}
+                    className="w-full h-[320px] object-cover rounded-xl border border-gray-200 dark:border-gray-800 cursor-pointer"
+                    onClick={() => { setLightboxIndex(idx); setLightboxOpen(true); }}
+                  />
+                </SwiperSlide>
+              ) : media.type === 'video' ? (
+                <SwiperSlide key={media.url}>
+                  <video src={media.url} controls className="w-full h-[320px] object-cover rounded-xl border border-gray-200 dark:border-gray-800" />
+                </SwiperSlide>
+              ) : media.type === 'audio' ? (
+                <SwiperSlide key={media.url}>
+                  <audio src={media.url} controls className="w-full" />
+                </SwiperSlide>
+              ) : media.type === 'document' ? (
+                <SwiperSlide key={media.url}>
+                  <div className="flex items-center justify-center h-[320px]">
+                    <a href={media.url} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline">Ver documento {media.name || ''}</a>
+                  </div>
+                </SwiperSlide>
+              ) : null
+            ))}
+          </Swiper>
           {/* Lightbox/Modal para imágenes */}
           {lightboxOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={() => setLightboxOpen(false)}>
@@ -391,6 +383,28 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
             </div>
           )}
         </>
+      )}
+      
+      {/* Post Content (TEXTO) debajo del media */}
+      <div className="px-4 pb-3 pt-2">
+        <p className="mb-3 text-gray-900 dark:text-white text-base leading-relaxed whitespace-pre-line break-words">{post.content}</p>
+      </div>
+      {/* Enlaces en el contenido del post */}
+      {post.content && post.content.match(urlRegex) && (
+        <div className="mb-3 px-4">
+          {post.content.match(urlRegex)?.map((url, idx) => (
+            <div key={idx} className="mb-2">
+              <a
+                href={url.startsWith('http') ? url : `https://${url}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary-600 underline break-all"
+              >
+                {url}
+              </a>
+            </div>
+          ))}
+        </div>
       )}
       
       {/* Post Actions */}

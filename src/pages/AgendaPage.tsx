@@ -78,7 +78,7 @@ const AgendaPage: React.FC = () => {
   };
 
   return (
-    <main className="p-2 sm:p-4 max-w-full sm:max-w-3xl mx-auto min-h-screen bg-gradient-to-b from-primary-50 via-white to-gray-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 pb-24">
+    <main className="w-full min-h-screen bg-white dark:bg-gray-900 p-0">
       <header className="py-4 sm:py-8 text-center">
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-primary-700 dark:text-primary-300 drop-shadow-sm mb-2">Agenda cultural</h1>
         <p className="text-gray-500 dark:text-gray-400 text-base sm:text-lg">Consulta y programa eventos, cumpleaños y tareas de la comunidad</p>

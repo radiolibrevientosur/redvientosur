@@ -212,7 +212,7 @@ const StoriesPage: React.FC = () => {
   }
   
   return (
-    <div className="space-y-6">
+    <>
       {/* Modal para crear story */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
@@ -300,8 +300,8 @@ const StoriesPage: React.FC = () => {
       )}
 
       {/* Story Circles */}
-      <div className="pt-2 pb-2 rounded-xl shadow flex items-center mx-auto max-w-2xl border border-primary-100 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <div className="flex overflow-x-auto space-x-4 px-4 py-2 hide-scrollbar w-full">
+      <div className="pt-2 pb-2 rounded-lg shadow-sm flex items-center w-full px-2 border border-transparent bg-white dark:bg-gray-900">
+        <div className="flex overflow-x-auto space-x-4 px-1 py-2 hide-scrollbar w-full">
           <motion.div
             whileTap={{ scale: 0.95 }}
             className="flex flex-col items-center min-w-[80px] group cursor-pointer"
@@ -457,7 +457,7 @@ const StoriesPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 };
 

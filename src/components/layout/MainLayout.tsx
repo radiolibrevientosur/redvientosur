@@ -24,9 +24,9 @@ const MainLayout: React.FC = () => {
           <LeftSidebar onOpenConversations={() => setShowConversations(true)} />
         </aside>
         {/* Contenido principal */}
-        <main className="flex-1 mx-auto max-w-full sm:max-w-2xl md:max-w-3xl p-2 sm:p-4 w-full bg-white dark:bg-gray-900 rounded-none sm:rounded-lg shadow-none sm:shadow-md lg:w-2/4 border-0 sm:border border-gray-100 dark:border-gray-800 min-h-[calc(100vh-56px)] overflow-y-auto">
+        <main className="flex-1 w-full bg-white dark:bg-gray-900 rounded-none shadow-none border-0 min-h-[calc(100vh-56px)] overflow-y-auto p-0">
           <MainContent />
-          <div className="container mx-auto px-0 sm:px-4 py-2 max-w-full sm:max-w-2xl">
+          <div className="w-full px-0 py-0">
             <Outlet />
           </div>
         </main>

@@ -171,7 +171,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
   }
   
   return (
-    <article className="feed-item rounded-none sm:rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-shadow duration-200 mb-6 overflow-visible relative mx-0 sm:mx-auto">
+    <article className="feed-item w-full border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-none rounded-none">
       {/* Post Header */}
       <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
         <div className="flex items-center space-x-3">

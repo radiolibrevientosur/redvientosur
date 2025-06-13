@@ -78,11 +78,9 @@ const HomePage = () => {
     : unifiedFeed.slice().sort((a, b) => b.date.getTime() - a.date.getTime());
 
   return (
-    <div className="space-y-4 w-full pb-24">
+    <div className="w-full pb-24 bg-white dark:bg-gray-900">
       {/* Stories Circles en la parte superior */}
-      <div className="mb-2 w-full">
-        <StoriesPage />
-      </div>
+      <StoriesPage />
       {/* Formulario para crear post */}
       <div className="w-full">
         <CreatePostForm 
@@ -172,13 +170,13 @@ const HomePage = () => {
           <p className="text-sm text-gray-400">¡Crea tu primera publicación, evento o cumpleaños para comenzar!</p>
         </div>
       ) : (
-        <div className="space-y-2 sm:space-y-4">
+        <div className="w-full">
           {sortedFeed.map((item) => {
             if (item.type === 'post' && 'post' in item) {
-              return <div className="feed-item rounded-none mx-0"><PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} /></div>;
+              return <PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} />;
             }
             if (item.type === 'event' && 'event' in item) {
-              return <div className="feed-item rounded-none mx-0"><EventoCulturalCard key={item.event.id} event={{
+              return <EventoCulturalCard key={item.event.id} event={{
                 id: item.event.id,
                 titulo: item.event.title,
                 descripcion: item.event.description,
@@ -194,7 +192,7 @@ const HomePage = () => {
                   technical_requirements: item.event.metadata?.technical_requirements || [],
                   tags: item.event.metadata?.tags || [],
                 }
-              }} onEdit={() => setEditingEvent(item.event)} onDeleted={() => setLocalEvents((prev) => prev.filter((e) => e.id !== item.event.id))} /></div>;
+              }} onEdit={() => setEditingEvent(item.event)} onDeleted={() => setLocalEvents((prev) => prev.filter((e) => e.id !== item.event.id))} />;
             }
             if (item.type === 'birthday' && 'birthday' in item) {
               return <div key={item.birthday.id} className="card feed-item rounded-none mx-0">Cumpleaños: {item.birthday.name}</div>;

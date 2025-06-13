@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { FileText, Mic, Send, Camera, Paperclip, Image, Music } from 'lucide-react';
+import { FileText, Mic, Send, Camera, Paperclip, Image, Music, Video } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { PostType, usePostStore } from '../../store/postStore';
 import { toast } from 'sonner';
@@ -86,10 +86,16 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
 
   // Nuevo handler para integración con AudioRecorder
   const handleAudioReady = (audioUrl: string | null) => {
-    setMediaUrls(audioUrl ? [{ url: audioUrl, type: 'audio', name: '' }] : []);
-    setPostType(audioUrl ? 'audio' : 'text');
-    setShowAudioRecorder(false); // Cierra el modal de grabación y previsualización al adjuntar el audio
-    setIsRecording(false);
+    if (showMicModal) {
+      setAudioPreviewUrl(audioUrl);
+      setIsRecording(false);
+      setShowMicRecordingAnim(false);
+    } else {
+      setMediaUrls(audioUrl ? [{ url: audioUrl, type: 'audio', name: '' }] : []);
+      setPostType(audioUrl ? 'audio' : 'text');
+      setShowAudioRecorder(false);
+      setIsRecording(false);
+    }
   };
 
   // Nuevo handler para integración con VideoRecorder
@@ -99,43 +105,105 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     setShowVideoRecorder(false);
   };
 
+  // Nuevo estado para el modal de grabación de voz
+  const [showMicModal, setShowMicModal] = useState(false);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  // Estado para animación de grabación en el modal
+  const [showMicRecordingAnim, setShowMicRecordingAnim] = useState(false);
+
   // Handlers para grabación tipo WhatsApp
   const handleMicPress = () => {
-    setShowAudioRecorder(true);
-    setShowFileUpload(false);
-    setShowVideoRecorder(false);
-    setIsRecording(true);
-    if (window.navigator.vibrate) window.navigator.vibrate([50, 30, 50]);
+    setShowMicModal(true);
+    setAudioPreviewUrl(null);
     setTimeout(() => {
       audioRecorderRef.current?.startRecording();
-    }, 50); // pequeño delay para asegurar montaje
+      setIsRecording(true);
+    }, 100);
   };
-  const handleMicRelease = () => {
+  // Nuevo: manejar el press dentro del modal
+  const handleMicModalPress = () => {
+    setAudioPreviewUrl(null);
+    setShowMicRecordingAnim(true);
+    setTimeout(() => {
+      audioRecorderRef.current?.startRecording();
+      setIsRecording(true);
+    }, 100);
+  };
+  const handleMicModalRelease = () => {
     if (isRecording) {
       audioRecorderRef.current?.stopRecording();
       setIsRecording(false);
+      setShowMicRecordingAnim(false);
     }
   };
-  const handleMicCancel = () => {
+  const handleMicModalCancel = () => {
     if (isRecording) {
       audioRecorderRef.current?.cancelRecording();
       setIsRecording(false);
     }
+    setShowMicModal(false);
+    setAudioPreviewUrl(null);
+    setShowMicRecordingAnim(false);
   };
 
-  const handleCameraPress = () => {
-    setShowVideoRecorder(true);
-    setShowFileUpload(false);
-    setShowAudioRecorder(false);
-    setTimeout(() => {
-      videoRecorderRef.current?.startRecording();
-    }, 50);
+  // Estado para el modal de cámara y previsualización
+  const [showCameraModal, setShowCameraModal] = useState(false);
+  const [cameraPreviewUrl, setCameraPreviewUrl] = useState<string | null>(null);
+  const [cameraPreviewType, setCameraPreviewType] = useState<'image' | 'video' | null>(null);
+  const [showVideoRecorderInModal, setShowVideoRecorderInModal] = useState(false);
+  // Estado para el input file de cámara
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  // Estado para tipo de captura en el modal de cámara
+  const [cameraCaptureType, setCameraCaptureType] = useState<'image' | 'video' | null>(null);
+
+  // Handler para abrir el input file de cámara según tipo
+  const handleOpenCameraPhoto = () => {
+    setCameraCaptureType('image');
+    setTimeout(() => cameraInputRef.current?.click(), 100);
   };
-  const handleCameraRelease = () => {
-    videoRecorderRef.current?.stopRecording();
+  const handleOpenCameraVideo = () => {
+    setCameraCaptureType('video');
+    setTimeout(() => cameraInputRef.current?.click(), 100);
   };
-  const handleCameraCancel = () => {
-    videoRecorderRef.current?.cancelRecording();
+
+  // Handler para cuando el usuario toma foto o graba video
+  const handleCameraFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    if (file.type.startsWith('image/')) {
+      setCameraPreviewUrl(url);
+      setCameraPreviewType('image');
+    } else if (file.type.startsWith('video/')) {
+      setCameraPreviewUrl(url);
+      setCameraPreviewType('video');
+    }
+    setShowVideoRecorderInModal(false);
+  };
+
+  // Handler para mostrar el modal de cámara
+  const handleCameraButtonClick = () => {
+    setShowCameraModal(true);
+    setCameraPreviewUrl(null);
+    setCameraPreviewType(null);
+    setShowVideoRecorderInModal(false);
+  };
+
+  // Handler para subir el video/foto
+  const handleUploadCameraMedia = () => {
+    if (cameraPreviewUrl && cameraPreviewType) {
+      setMediaUrls([{ url: cameraPreviewUrl, type: cameraPreviewType, name: '' }]);
+      setPostType(cameraPreviewType);
+      setShowCameraModal(false);
+      setCameraPreviewUrl(null);
+      setCameraPreviewType(null);
+    }
+  };
+  const handleCancelCameraModal = () => {
+    setShowCameraModal(false);
+    setCameraPreviewUrl(null);
+    setCameraPreviewType(null);
+    setShowVideoRecorderInModal(false);
   };
 
   const handleEmojiSelect = (emoji: any) => {
@@ -241,6 +309,121 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
 
   return (
     <div className="feed-item mb-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm rounded-none sm:rounded-lg mx-0 sm:mx-auto p-0 sm:p-0">
+      {/* Modal flotante de grabación de voz */}
+      {showMicModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-6 w-full max-w-xs flex flex-col items-center gap-4 relative animate-slide-up">
+            <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" onClick={handleMicModalCancel}>&times;</button>
+            <h3 className="text-lg font-bold mb-2">Grabar nota de voz</h3>
+            {/* Lógica de renderizado del modal: */}
+            {/* 1. Si hay audio grabado, mostrar reproductor y subir/cancelar */}
+            {audioPreviewUrl ? (
+              <>
+                <audio src={audioPreviewUrl} controls autoPlay className="w-full my-2" />
+                <button
+                  type="button"
+                  className="btn btn-primary px-4 py-2 rounded-full mt-2"
+                  onClick={handleUploadAudioFromModal}
+                >Subir nota de voz</button>
+                <button
+                  type="button"
+                  className="btn btn-secondary px-4 py-2 rounded-full mt-2"
+                  onClick={handleMicModalCancel}
+                >Cancelar</button>
+              </>
+            ) : showMicRecordingAnim ? (
+              // 2. Si está grabando, solo animación
+              <div className="flex flex-col items-center justify-center gap-2 mt-4">
+                <div className="relative p-6 rounded-full bg-red-100 text-red-600 shadow-lg border-4 border-red-300">
+                  <Mic className="h-10 w-10 relative z-10 animate-pulse" />
+                  <span className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping" />
+                </div>
+                <div className="text-red-600 font-bold mt-2 flex items-center gap-2">Grabando... Suelta para previsualizar</div>
+              </div>
+            ) : (
+              // 3. Estado inicial: solo botón micrófono
+              <button
+                type="button"
+                className={`relative p-6 rounded-full bg-red-100 text-red-600 shadow-lg border-4 border-red-300 focus:outline-none transition-all duration-200`}
+                onMouseDown={handleMicModalPress}
+                onMouseUp={handleMicModalRelease}
+                onMouseLeave={handleMicModalCancel}
+                onTouchStart={handleMicModalPress}
+                onTouchEnd={handleMicModalRelease}
+                onTouchCancel={handleMicModalCancel}
+                aria-label="Grabar nota de voz"
+                disabled={isSubmitting}
+              >
+                <Mic className="h-10 w-10 relative z-10" />
+              </button>
+            )}
+            {/* AudioRecorder oculto para capturar el audio */}
+            <AudioRecorder ref={audioRecorderRef} onAudioReady={handleAudioReady} style={{ display: 'none' }} />
+          </div>
+        </div>
+      )}
+      {/* Modal de cámara */}
+      {showCameraModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-6 w-full max-w-xs flex flex-col items-center gap-4 relative animate-slide-up">
+            <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" onClick={handleCancelCameraModal}>&times;</button>
+            <h3 className="text-lg font-bold mb-2">Cámara</h3>
+            {/* Si hay previsualización, mostrarla con subir/cancelar */}
+            {cameraPreviewUrl ? (
+              <>
+                {cameraPreviewType === 'video' ? (
+                  <video src={cameraPreviewUrl} controls autoPlay className="w-full my-2 rounded-lg" />
+                ) : cameraPreviewType === 'image' ? (
+                  <img src={cameraPreviewUrl} alt="Previsualización" className="w-full my-2 rounded-lg" />
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-primary px-4 py-2 rounded-full mt-2"
+                  onClick={handleUploadCameraMedia}
+                >Subir</button>
+                <button
+                  type="button"
+                  className="btn btn-secondary px-4 py-2 rounded-full mt-2"
+                  onClick={handleCancelCameraModal}
+                >Cancelar</button>
+              </>
+            ) : (
+              <>
+                <div className="flex gap-4">
+                  <button
+                    type="button"
+                    className="relative p-6 rounded-full bg-blue-100 text-blue-600 shadow-lg border-4 border-blue-300 focus:outline-none transition-all duration-200 flex flex-col items-center"
+                    onClick={handleOpenCameraPhoto}
+                    aria-label="Tomar foto"
+                    disabled={isSubmitting}
+                  >
+                    <Camera className="h-10 w-10 relative z-10" />
+                    <span className="text-xs mt-1">Foto</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="relative p-6 rounded-full bg-blue-100 text-blue-600 shadow-lg border-4 border-blue-300 focus:outline-none transition-all duration-200 flex flex-col items-center"
+                    onClick={handleOpenCameraVideo}
+                    aria-label="Grabar video"
+                    disabled={isSubmitting}
+                  >
+                    <Video className="h-10 w-10 relative z-10" />
+                    <span className="text-xs mt-1">Video</span>
+                  </button>
+                </div>
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept={cameraCaptureType === 'image' ? 'image/*' : cameraCaptureType === 'video' ? 'video/*' : ''}
+                  capture="environment"
+                  style={{ display: 'none' }}
+                  onChange={handleCameraFileChange}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <form onSubmit={handleSubmit}>
         {/* Contenido superior (avatar y preview) */}
         <div className="p-4 pb-2">
@@ -309,38 +492,23 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               )}
             </button>
           ) : (
-            // 1. Animación visual del botón de micrófono
-            // Cambia el color y agrega animación de círculo creciente durante la grabación
+            // Botón micrófono ahora abre el modal
             <button
               type="button"
-              className={`relative p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 ml-1 transition-all duration-200
-                ${showAudioRecorder ? 'bg-red-200 text-red-600 ring-4 ring-red-400/30 animate-pulse' : ''}`}
-              onMouseDown={handleMicPress}
-              onMouseUp={handleMicRelease}
-              onMouseLeave={handleMicCancel}
-              onTouchStart={handleMicPress}
-              onTouchEnd={handleMicRelease}
-              onTouchCancel={handleMicCancel}
+              className={`relative p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 ml-1 transition-all duration-200`}
+              onClick={handleMicPress}
               aria-label="Grabar nota de voz"
               disabled={isSubmitting}
             >
-              {isRecording && (
-                <span className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping" />
-              )}
               <Mic className="h-5 w-5 relative z-10" />
             </button>
           )}
-          {/* Botón cámara opcional, puedes dejarlo si lo usas mucho */}
+          {/* Botón cámara ahora solo abre el modal de cámara */}
           <button
             type="button"
-            className={`p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 ml-1 ${showVideoRecorder ? 'bg-blue-200 text-blue-600' : ''}`}
-            onMouseDown={handleCameraPress}
-            onMouseUp={handleCameraRelease}
-            onMouseLeave={handleCameraCancel}
-            onTouchStart={handleCameraPress}
-            onTouchEnd={handleCameraRelease}
-            onTouchCancel={handleCameraCancel}
-            aria-label="Grabar nota de video"
+            className={`p-2 rounded-full text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 ml-1`}
+            onClick={handleCameraButtonClick}
+            aria-label="Abrir cámara"
             disabled={isSubmitting}
           >
             <Camera className="h-5 w-5" />

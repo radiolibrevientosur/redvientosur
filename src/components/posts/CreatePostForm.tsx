@@ -307,16 +307,26 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
     e.preventDefault();
   };
 
+  // Handler para enviar el audio grabado desde el modal
+  const handleUploadAudioFromModal = () => {
+    if (audioPreviewUrl) {
+      setMediaUrls([{ url: audioPreviewUrl, type: 'audio', name: '' }]);
+      setPostType('audio');
+      setShowMicModal(false);
+      setAudioPreviewUrl(null);
+    }
+  };
+
   return (
     <div className="feed-item mb-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm rounded-none sm:rounded-lg mx-0 sm:mx-auto p-0 sm:p-0">
       {/* Modal flotante de grabación de voz */}
       {showMicModal && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-6 w-full max-w-xs flex flex-col items-center gap-4 relative animate-slide-up">
+            {/* Mantén el botón cancelar de la esquina superior */}
             <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl" onClick={handleMicModalCancel}>&times;</button>
             <h3 className="text-lg font-bold mb-2">Grabar nota de voz</h3>
-            {/* Lógica de renderizado del modal: */}
-            {/* 1. Si hay audio grabado, mostrar reproductor y subir/cancelar */}
+            {/* Si hay audio grabado, mostrar reproductor y subir/cancelar */}
             {audioPreviewUrl ? (
               <>
                 <audio src={audioPreviewUrl} controls autoPlay className="w-full my-2" />
@@ -324,41 +334,20 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
                   type="button"
                   className="btn btn-primary px-4 py-2 rounded-full mt-2"
                   onClick={handleUploadAudioFromModal}
-                >Subir nota de voz</button>
+                >Enviar</button>
+                {/* Elimina el botón cancelar debajo del reproductor */}
+              </>
+            ) : (
+              <>
+                <AudioRecorder ref={audioRecorderRef} onAudioReady={handleAudioReady} />
                 <button
                   type="button"
-                  className="btn btn-secondary px-4 py-2 rounded-full mt-2"
-                  onClick={handleMicModalCancel}
-                >Cancelar</button>
+                  className="btn btn-danger px-4 py-2 rounded-full mt-4"
+                  onClick={() => audioRecorderRef.current?.stopRecording()}
+                  disabled={isSubmitting}
+                >Detener</button>
               </>
-            ) : showMicRecordingAnim ? (
-              // 2. Si está grabando, solo animación
-              <div className="flex flex-col items-center justify-center gap-2 mt-4">
-                <div className="relative p-6 rounded-full bg-red-100 text-red-600 shadow-lg border-4 border-red-300">
-                  <Mic className="h-10 w-10 relative z-10 animate-pulse" />
-                  <span className="absolute inset-0 rounded-full border-2 border-red-400 animate-ping" />
-                </div>
-                <div className="text-red-600 font-bold mt-2 flex items-center gap-2">Grabando... Suelta para previsualizar</div>
-              </div>
-            ) : (
-              // 3. Estado inicial: solo botón micrófono
-              <button
-                type="button"
-                className={`relative p-6 rounded-full bg-red-100 text-red-600 shadow-lg border-4 border-red-300 focus:outline-none transition-all duration-200`}
-                onMouseDown={handleMicModalPress}
-                onMouseUp={handleMicModalRelease}
-                onMouseLeave={handleMicModalCancel}
-                onTouchStart={handleMicModalPress}
-                onTouchEnd={handleMicModalRelease}
-                onTouchCancel={handleMicModalCancel}
-                aria-label="Grabar nota de voz"
-                disabled={isSubmitting}
-              >
-                <Mic className="h-10 w-10 relative z-10" />
-              </button>
             )}
-            {/* AudioRecorder oculto para capturar el audio */}
-            <AudioRecorder ref={audioRecorderRef} onAudioReady={handleAudioReady} style={{ display: 'none' }} />
           </div>
         </div>
       )}
@@ -407,7 +396,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
                     aria-label="Grabar video"
                     disabled={isSubmitting}
                   >
-                    <Video className="h-10 w-10 relative z-10" />
+                    <Camera className="h-10 w-10 relative z-10" />
                     <span className="text-xs mt-1">Video</span>
                   </button>
                 </div>

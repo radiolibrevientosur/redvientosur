@@ -129,13 +129,6 @@ const RightSidebar: React.FC = () => {
 					))}
 				</div>
 			</div>
-			{/* Botón para abrir el modal de conversaciones */}
-			<button
-				className="mt-2 px-4 py-2 rounded bg-primary-600 text-white hover:bg-primary-700 transition text-sm dark:bg-primary-700 dark:hover:bg-primary-800"
-				onClick={() => setShowConversations(true)}
-			>
-				Mensajes
-			</button>
 			{/* Modal de conversaciones flotante */}
 			{showConversations && (
 				<div className="fixed inset-0 z-50 flex items-start justify-end pointer-events-none">

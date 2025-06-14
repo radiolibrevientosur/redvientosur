@@ -27,8 +27,7 @@ const BottomNavigation: React.FC = () => {
               <NavLink
                 key={path}
                 to={path}
-                className={`bottom-tab relative h-full flex items-center justify-center ${isCenter ? 'z-10' : ''}`}
-                style={isCenter ? { marginTop: '-18px' } : {}}
+                className="bottom-tab relative h-full flex flex-col items-center justify-center"
               >
                 {isActive && (
                   <motion.div
@@ -37,9 +36,9 @@ const BottomNavigation: React.FC = () => {
                     transition={{ duration: 0.2 }}
                   />
                 )}
-                <div className={`flex flex-col items-center ${isCenter ? 'rounded-full bg-blue-600 text-white shadow-lg p-3 scale-110' : ''}`}>
-                  <Icon className={`bottom-tab-icon ${isActive ? 'text-primary-600 dark:text-primary-500' : 'text-gray-500 dark:text-gray-400'} ${isCenter ? 'text-white' : ''}`} />
-                  <span className={`text-xs ${isActive ? 'font-medium text-primary-600 dark:text-primary-500' : 'text-gray-500 dark:text-gray-400'} ${isCenter ? 'text-white' : ''}`}>{label}</span>
+                <div className="flex flex-col items-center justify-center h-full">
+                  <Icon className={`bottom-tab-icon ${isActive ? 'text-primary-600 dark:text-primary-500' : 'text-gray-500 dark:text-gray-400'}`} />
+                  <span className={`text-xs ${isActive ? 'font-medium text-primary-600 dark:text-primary-500' : 'text-gray-500 dark:text-gray-400'}`}>{label}</span>
                 </div>
               </NavLink>
             );

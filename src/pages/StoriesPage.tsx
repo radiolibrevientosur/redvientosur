@@ -317,7 +317,7 @@ const StoriesPage: React.FC = () => {
               ) : null}
               <PlusCircle className="h-8 w-8 text-primary-500 z-20 group-hover:text-accent-500 transition-colors drop-shadow-lg" />
             </div>
-            <span className="text-xs mt-1 text-gray-700 dark:text-gray-300 font-bold group-hover:text-primary-600 tracking-wide uppercase letter-spacing-wider transition-colors">Crear</span>
+            <span className="text-xs mt-1 text-gray-700 dark:text-gray-300 font-bold group-hover:text-primary-600 tracking-wide uppercase letter-spacing-wider transition-colors">Historias</span>
           </motion.div>
           {stories.map((story, index) => (
             <motion.div

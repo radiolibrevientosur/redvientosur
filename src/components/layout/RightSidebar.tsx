@@ -72,63 +72,85 @@ const RightSidebar: React.FC = () => {
 		setShowConversations(false);
 	};
 
+	// Escuchar el evento global para abrir el modal de conversaciones
+	useEffect(() => {
+		const openModal = () => setShowConversations(true);
+		window.addEventListener('openConversationsModal', openModal);
+		return () => window.removeEventListener('openConversationsModal', openModal);
+	}, []);
+
 	return (
-		<div className="flex flex-col h-full p-4 gap-6 bg-white dark:bg-gray-900 relative hidden lg:block">
-			{/* Usuarios en línea */}
-			<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
-				<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
-					<HiOutlineUsers /> Usuarios en línea
-				</div>
-				<div className="flex -space-x-2 mb-1">
-					{onlineUsers.map((u) => (
-						<img
-							key={u.id}
-							src={u.avatar_url || '/default-avatar.png'}
-							alt={u.nombre_usuario}
-							className="w-8 h-8 rounded-full border-2 border-white dark:border-gray-900"
-						/>
-					))}
-				</div>
-				<div className="text-xs text-gray-500 dark:text-gray-300">
-					{onlineUsers.length} conectados
-				</div>
-			</div>
-			{/* Eventos próximos */}
-			<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
-				<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
-					<HiOutlineCalendar /> Eventos próximos
-				</div>
-				{isLoading ? (
-					<div className="text-xs text-gray-400 dark:text-gray-300">Cargando eventos...</div>
-				) : (
-					<ul className="text-sm text-gray-600 dark:text-gray-200 space-y-1">
-						{upcomingEvents.length === 0 ? (
-							<li className="text-xs text-gray-400 dark:text-gray-300">No hay eventos próximos</li>
-						) : upcomingEvents.map((e) => (
-							<li key={e.id} className="flex justify-between">
-								<span>{e.title}</span>
-								<span className="text-xs text-gray-400 dark:text-gray-300">{new Date(e.date).toLocaleString()}</span>
-							</li>
+		<>
+			{/* Sidebar derecho */}
+			<div className="flex flex-col h-full p-4 gap-6 bg-white dark:bg-gray-900 relative hidden lg:block">
+				{/* Usuarios en línea */}
+				<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
+					<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
+						<HiOutlineUsers /> Usuarios en línea
+					</div>
+					<div className="flex -space-x-2 mb-1">
+						{onlineUsers.map((u) => (
+							<img
+								key={u.id}
+								src={u.avatar_url || '/default-avatar.png'}
+								alt={u.nombre_usuario}
+								className="w-8 h-8 rounded-full border-2 border-white dark:border-gray-900"
+							/>
 						))}
-					</ul>
-				)}
-			</div>
-			{/* Tendencias */}
-			<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
-				<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
-					<HiOutlineHashtag /> Tendencias
+					</div>
+					<div className="text-xs text-gray-500 dark:text-gray-300">
+						{onlineUsers.length} conectados
+					</div>
 				</div>
-				<div className="flex flex-wrap gap-2">
-					{trends.map((t, i) => (
-						<span
-							key={i}
-							className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded-full text-xs font-medium"
-						>
-							{t}
-						</span>
-					))}
+				{/* Eventos próximos */}
+				<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
+					<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
+						<HiOutlineCalendar /> Eventos próximos
+					</div>
+					{isLoading ? (
+						<div className="text-xs text-gray-400 dark:text-gray-300">Cargando eventos...</div>
+					) : (
+						<ul className="text-sm text-gray-600 dark:text-gray-200 space-y-1">
+							{upcomingEvents.length === 0 ? (
+								<li className="text-xs text-gray-400 dark:text-gray-300">No hay eventos próximos</li>
+							) : upcomingEvents.map((e) => (
+								<li key={e.id} className="flex justify-between">
+									<span>{e.title}</span>
+									<span className="text-xs text-gray-400 dark:text-gray-300">{new Date(e.date).toLocaleString()}</span>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+				{/* Tendencias */}
+				<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
+					<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
+						<HiOutlineHashtag /> Tendencias
+					</div>
+					<div className="flex flex-wrap gap-2">
+						{trends.map((t, i) => (
+							<span
+								key={i}
+								className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded-full text-xs font-medium"
+							>
+								{t}
+							</span>
+						))}
+					</div>
 				</div>
 			</div>
+			{/* Botón flotante para escribir mensaje, más arriba */}
+			<button
+				className="fixed right-6 z-50 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg p-4 flex items-center gap-2 transition-all"
+				style={{ bottom: '372rem', boxShadow: '0 4px 16px 0 rgba(0,0,0,0.18)' }}
+				onClick={() => setShowConversations(true)}
+				aria-label="Escribir mensaje"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+					<path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.008c0 .414-.336.75-.75.75H3.75a.75.75 0 01-.75-.75V6.75" />
+				</svg>
+				<span className="hidden sm:inline font-semibold">Escribir mensaje</span>
+			</button>
 			{/* Modal de conversaciones flotante */}
 			{showConversations && (
 				<div className="fixed inset-0 z-50 flex items-start justify-end pointer-events-none">
@@ -136,12 +158,22 @@ const RightSidebar: React.FC = () => {
 						className="absolute inset-0 bg-black bg-opacity-40 pointer-events-auto"
 						onClick={() => setShowConversations(false)}
 					/>
-					<aside className="relative mt-8 mr-8 w-[min(22rem,90vw)] max-w-full h-[80vh] bg-white dark:bg-gray-900 shadow-2xl rounded-xl z-50 flex flex-col pointer-events-auto animate-fade-in border dark:border-gray-800" style={{ minWidth: '18rem' }}>
+					<aside
+						className="relative mt-8 mr-8 w-[min(22rem,90vw)] max-w-full h-[80vh] bg-white dark:bg-gray-900 shadow-2xl rounded-xl z-50 flex flex-col pointer-events-auto border dark:border-gray-800 animate-fade-in transition-transform duration-300"
+						style={{ minWidth: '18rem', transform: showConversations ? 'translateY(0)' : 'translateY(100%)' }}
+					>
+						{/* Barra para arrastrar/minimizar */}
+						<div
+							className="w-full flex justify-center items-center cursor-pointer py-2"
+							onClick={() => setShowConversations(false)}
+						>
+							<div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-700" />
+						</div>
 						<ConversationsList onSelectUser={handleSelectUser} />
 					</aside>
 				</div>
 			)}
-		</div>
+		</>
 	);
 };
 

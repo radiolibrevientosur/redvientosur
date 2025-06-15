@@ -139,19 +139,7 @@ const RightSidebar: React.FC = () => {
 					</div>
 				</div>
 			</div>
-			{/* Botón flotante para escribir mensaje, más arriba */}
-			<button
-				className="fixed right-6 z-50 bg-primary-600 hover:bg-primary-700 text-white rounded-full shadow-lg p-4 flex items-center gap-2 transition-all"
-				style={{ bottom: '372rem', boxShadow: '0 4px 16px 0 rgba(0,0,0,0.18)' }}
-				onClick={() => setShowConversations(true)}
-				aria-label="Escribir mensaje"
-			>
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-					<path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H4.5a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.008c0 .414-.336.75-.75.75H3.75a.75.75 0 01-.75-.75V6.75" />
-				</svg>
-				<span className="hidden sm:inline font-semibold">Escribir mensaje</span>
-			</button>
-			{/* Modal de conversaciones flotante */}
+			
 			{showConversations && (
 				<div className="fixed inset-0 z-50 flex items-start justify-end pointer-events-none">
 					<div

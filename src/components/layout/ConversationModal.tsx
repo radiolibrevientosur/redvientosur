@@ -3,6 +3,7 @@ import { HiOutlineMinus, HiOutlineX } from 'react-icons/hi';
 import { ConversationsList } from '../messages/ConversationsList';
 import { useAuthStore } from '../../store/authStore';
 import { useRecentConversations } from '../../hooks/useRecentConversations';
+import ChatUserModal from './ChatUserModal';
 
 interface ConversationModalProps {
   open: boolean;
@@ -13,6 +14,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({ open, onClose }) 
   const { user } = useAuthStore();
   const { conversations, loading } = useRecentConversations(user?.id || '');
   const [minimized, setMinimized] = useState(false);
+  const [chatUser, setChatUser] = useState<{id: string, name?: string, avatar?: string} | null>(null);
 
   if (!open) return null;
   return (
@@ -43,9 +45,17 @@ const ConversationModal: React.FC<ConversationModalProps> = ({ open, onClose }) 
             {/* Sugerencias y barra de búsqueda ahora están en ConversationsList */}
             <div className="flex-1 overflow-y-auto">
               <ConversationsList
-                onSelectUser={() => {}}
+                onSelectUser={(id, name, avatar) => setChatUser({id, name, avatar})}
               />
             </div>
+            {/* Modal de chat con usuario seleccionado */}
+            <ChatUserModal
+              open={!!chatUser}
+              onClose={() => setChatUser(null)}
+              userId={chatUser?.id || ''}
+              userName={chatUser?.name}
+              userAvatar={chatUser?.avatar}
+            />
           </>
         )}
       </aside>

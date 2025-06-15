@@ -1,208 +1,169 @@
-import { useEffect, useState } from 'react';
-import CreatePostForm from '../components/posts/CreatePostForm';
-import PostCard from '../components/posts/PostCard';
-import SkeletonCard from '../components/ui/SkeletonCard';
-import { usePostStore } from '../store/postStore';
-import { useEventStore } from '../store/eventStore';
-import EventoCulturalCard from '../components/cultural/EventoCulturalCard';
-import CreateEventForm from '../components/calendar/CreateEventForm';
-import { Event } from '../store/eventStore';
-import StoriesPage from './StoriesPage';
-import SuggestionsToFollow from '../components/profile/SuggestionsToFollow';
+import { HiOutlineUsers, HiOutlineHashtag, HiOutlineCalendar } from 'react-icons/hi';
+import { useState, useEffect } from 'react';
+import { ConversationsList } from '../messages/ConversationsList';
+import { useEventStore } from '../../store/eventStore';
+import { supabase } from '../../lib/supabase';
 
-const FEED_MODES = [
-  { label: 'Para ti', value: 'feed' },
-  { label: 'Lo último', value: 'timeline' }
-];
+function extractHashtags(text: string): string[] {
+  if (!text) return [];
+  return (text.match(/#[\wáéíóúüñÁÉÍÓÚÜÑ0-9_]+/g) || []).map(t => t.toLowerCase());
+}
 
-const HomePage = () => {
-  const { posts, isLoading: isLoadingPosts, fetchPosts } = usePostStore();
-  const { events, isLoading: isLoadingEvents, fetchEvents } = useEventStore();
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
-  const [feedMode, setFeedMode] = useState<'feed' | 'timeline'>('feed');
-  // Estados locales para manipulación inmediata de UI
-  const [localPosts, setLocalPosts] = useState(posts);
-  const [localEvents, setLocalEvents] = useState(events);
+const RightSidebar: React.FC = () => {
+	const [showConversations, setShowConversations] = useState(false);
+	const { events, fetchEvents, isLoading } = useEventStore();
+	const [onlineUsers, setOnlineUsers] = useState<{ id: string; nombre_usuario: string; avatar_url: string }[]>([]);
+	const [trends, setTrends] = useState<string[]>([]);
 
-  useEffect(() => {
-    setLocalPosts(posts);
-  }, [posts]);
-  useEffect(() => {
-    setLocalEvents(events);
-  }, [events]);
+	useEffect(() => {
+		fetchEvents();
+	}, [fetchEvents]);
 
-  useEffect(() => {
-    fetchPosts();
-    fetchEvents();
-  }, [fetchPosts, fetchEvents]);
+	useEffect(() => {
+		const fetchOnline = async () => {
+			const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+			const { data } = await supabase
+				.from('usuarios')
+				.select('id, nombre_usuario, avatar_url, last_online')
+				.not('last_online', 'is', null)
+				.gt('last_online', twoMinutesAgo)
+				.order('last_online', { ascending: false });
+			setOnlineUsers(data || []);
+		};
+		fetchOnline();
+		const interval = setInterval(fetchOnline, 30000); // refresca cada 30s
+		return () => clearInterval(interval);
+	}, []);
 
-  // Simulación de cumpleaños (puedes reemplazar por tu fuente real)
-  const [localBirthdays] = useState<any[]>([
-    // Ejemplo:
-    // { id: 'b1', name: 'Juan Pérez', date: '2025-06-01' },
-  ]);
+	useEffect(() => {
+		// Tendencias reales de los últimos 7 días
+		const fetchTrends = async () => {
+			const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+			const { data, error } = await supabase
+				.from('posts')
+				.select('contenido, creado_en')
+				.gte('creado_en', since)
+				.order('creado_en', { ascending: false });
+			if (error) return;
+			const hashtagCount: Record<string, number> = {};
+			(data || []).forEach((post: any) => {
+				extractHashtags(post.contenido).forEach(tag => {
+					hashtagCount[tag] = (hashtagCount[tag] || 0) + 1;
+				});
+			});
+			const sorted = Object.entries(hashtagCount)
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, 8)
+				.map(([tag]) => tag);
+			// Cambia aquí los valores por defecto
+			setTrends(sorted.length > 0 ? sorted : ['#redvientosur', '#cultura', '#Moron']);
+		};
+		fetchTrends();
+	}, []);
 
-  // Unificar feed: posts, eventos y cumpleaños
-  const unifiedFeed = [
-    ...localPosts.map(post => ({
-      type: 'post',
-      date: new Date(post.createdAt),
-      post
-    })),
-    ...localEvents
-      .filter(event => event.date && !isNaN(new Date(event.date).getTime()))
-      .map(event => ({
-        type: 'event',
-        date: new Date(event.date),
-        event
-      })),
-    ...localBirthdays.map(birthday => ({
-      type: 'birthday',
-      date: new Date(birthday.date),
-      birthday
-    }))
-  ];
+	const upcomingEvents = events
+		.filter(e => new Date(e.date) >= new Date())
+		.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+		.slice(0, 5);
 
-  // Ordenar según modo
-  const sortedFeed = feedMode === 'feed'
-    ? unifiedFeed.slice().sort((a, b) => {
-        if (a.type === 'post' && b.type === 'post' && 'post' in a && 'post' in b) {
-          return b.post.likes.length - a.post.likes.length;
-        }
-        // Si solo uno es post, el post va primero
-        if (a.type === 'post') return -1;
-        if (b.type === 'post') return 1;
-        // Si ambos no son post, ordenar por fecha
-        return b.date.getTime() - a.date.getTime();
-      })
-    : unifiedFeed.slice().sort((a, b) => b.date.getTime() - a.date.getTime());
+	// Handler para seleccionar usuario (puedes personalizar la acción)
+	const handleSelectUser = () => {
+		// Aquí puedes manejar la selección de usuario/conversación
+		setShowConversations(false);
+	};
 
-  return (
-    <div className="w-full pb-24 bg-white dark:bg-gray-900">
-      {/* Stories Circles en la parte superior */}
-      <StoriesPage />
-      {/* Formulario para crear post */}
-      <div className="w-full">
-        <CreatePostForm 
-          className="rounded-none mx-0"
-          onSuccess={() => {
-            setTimeout(() => {
-              const firstPost = document.querySelector('.feed-item');
-              if (firstPost) firstPost.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
-          }} 
-        />
-      </div>
-      {/* Sugerencias de perfiles a seguir debajo del textarea, solo móvil */}
-      <div className="block sm:hidden mb-2 w-full">
-        <SuggestionsToFollow />
-      </div>
-      {/* Sugerencias de perfiles a seguir en escritorio */}
-      <div className="hidden sm:block w-full">
-        <SuggestionsToFollow />
-      </div>
-      {/* Modal de edición de evento */}
-      {editingEvent && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-4 w-full max-w-lg relative animate-fade-in">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-              onClick={() => setEditingEvent(null)}
-            >
-              ✕
-            </button>
-            <h2 className="text-lg font-bold mb-4">Editar evento</h2>
-            <CreateEventForm
-              date={new Date(editingEvent.date)}
-              onSuccess={() => { setEditingEvent(null); fetchEvents(); }}
-              onCancel={() => setEditingEvent(null)}
-              initialData={{
-                id: editingEvent.id,
-                title: editingEvent.title,
-                description: editingEvent.description,
-                event_type: editingEvent.type,
-                date: editingEvent.date.split('T')[0],
-                location: editingEvent.location,
-                target_audience: (['Infantil', 'Adultos', 'Todo Público'].includes(editingEvent.metadata?.target_audience ?? '')
-                  ? editingEvent.metadata?.target_audience
-                  : undefined) as 'Infantil' | 'Adultos' | 'Todo Público' | undefined,
-                cost: { type: 'free' },
-                responsible_person: editingEvent.metadata?.responsible_person || { name: '', phone: '' },
-                technical_requirements: editingEvent.metadata?.technical_requirements || [],
-                image_url: editingEvent.imagen_url,
-                tags: editingEvent.metadata?.tags || [],
-                recurrence: (
-                  editingEvent.metadata?.recurrence &&
-                  typeof editingEvent.metadata?.recurrence.type === 'string' &&
-                  ['custom', 'none', 'daily', 'weekly', 'monthly'].includes(editingEvent.metadata?.recurrence.type)
-                )
-                  ? {
-                      ...editingEvent.metadata?.recurrence,
-                      type: editingEvent.metadata?.recurrence.type as 'custom' | 'none' | 'daily' | 'weekly' | 'monthly'
-                    }
-                  : { type: 'none' }
-              }}
-            />
-          </div>
-        </div>
-      )}
-      {/* Selector Feed/Timeline */}
-      <div className="flex justify-center gap-2 my-2 sm:my-4">
-        {FEED_MODES.map((mode) => (
-          <button
-            key={mode.value}
-            className={`px-3 py-1 sm:px-4 sm:py-2 rounded-full font-semibold transition-colors duration-150 text-xs sm:text-base ${feedMode === mode.value ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}
-            onClick={() => setFeedMode(mode.value as 'feed' | 'timeline')}
-            aria-pressed={feedMode === mode.value}
-          >
-            {mode.label}
-          </button>
-        ))}
-      </div>
-      {/* Feed unificado */}
-      {(isLoadingPosts || isLoadingEvents) ? (
-        <div>
-          {[...Array(3)].map((_, i) => <SkeletonCard key={i} type="post" />)}
-        </div>
-      ) : sortedFeed.length === 0 ? (
-        <div className="card py-8 text-center">
-          <p className="text-gray-500 dark:text-gray-400 text-lg font-semibold mb-2">No hay novedades aún</p>
-          <p className="text-sm text-gray-400">¡Crea tu primera publicación, evento o cumpleaños para comenzar!</p>
-        </div>
-      ) : (
-        <div className="w-full">
-          {sortedFeed.map((item) => {
-            if (item.type === 'post' && 'post' in item) {
-              return <PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} />;
-            }
-            if (item.type === 'event' && 'event' in item) {
-              return <EventoCulturalCard key={item.event.id} event={{
-                id: item.event.id,
-                titulo: item.event.title,
-                descripcion: item.event.description,
-                fecha_inicio: item.event.date,
-                ubicacion: item.event.location || '',
-                imagen_url: item.event.imagen_url,
-                categoria: '',
-                tipo: item.event.type,
-                userId: item.event.userId,
-                metadata: {
-                  target_audience: item.event.metadata?.target_audience as any || '',
-                  responsible_person: item.event.metadata?.responsible_person || { name: '', phone: '' },
-                  technical_requirements: item.event.metadata?.technical_requirements || [],
-                  tags: item.event.metadata?.tags || [],
-                }
-              }} onEdit={() => setEditingEvent(item.event)} onDeleted={() => setLocalEvents((prev) => prev.filter((e) => e.id !== item.event.id))} />;
-            }
-            if (item.type === 'birthday' && 'birthday' in item) {
-              return <div key={item.birthday.id} className="card feed-item rounded-none mx-0">Cumpleaños: {item.birthday.name}</div>;
-            }
-            return null;
-          })}
-        </div>
-      )}
-    </div>
-  );
+	// Escuchar el evento global para abrir el modal de conversaciones
+	useEffect(() => {
+		const openModal = () => setShowConversations(true);
+		window.addEventListener('openConversationsModal', openModal);
+		return () => window.removeEventListener('openConversationsModal', openModal);
+	}, []);
+
+	return (
+		<>
+			{/* Sidebar derecho */}
+			<div className="flex flex-col h-full p-4 gap-6 bg-white dark:bg-gray-900 relative hidden lg:block">
+				{/* Usuarios en línea */}
+				<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
+					<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
+						<HiOutlineUsers /> Usuarios en línea
+					</div>
+					<div className="flex -space-x-2 mb-1">
+						{onlineUsers.map((u) => (
+							<img
+								key={u.id}
+								src={u.avatar_url || '/default-avatar.png'}
+								alt={u.nombre_usuario}
+								className="w-8 h-8 rounded-full border-2 border-white dark:border-gray-900"
+							/>
+						))}
+					</div>
+					<div className="text-xs text-gray-500 dark:text-gray-300">
+						{onlineUsers.length} conectados
+					</div>
+				</div>
+				{/* Eventos próximos */}
+				<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
+					<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
+						<HiOutlineCalendar /> Eventos próximos
+					</div>
+					{isLoading ? (
+						<div className="text-xs text-gray-400 dark:text-gray-300">Cargando eventos...</div>
+					) : (
+						<ul className="text-sm text-gray-600 dark:text-gray-200 space-y-1">
+							{upcomingEvents.length === 0 ? (
+								<li className="text-xs text-gray-400 dark:text-gray-300">No hay eventos próximos</li>
+							) : upcomingEvents.map((e) => (
+								<li key={e.id} className="flex justify-between">
+									<span>{e.title}</span>
+									<span className="text-xs text-gray-400 dark:text-gray-300">{new Date(e.date).toLocaleString()}</span>
+								</li>
+							))}
+						</ul>
+					)}
+				</div>
+				{/* Tendencias */}
+				<div className="rounded-lg shadow-md p-4 bg-white dark:bg-gray-800">
+					<div className="font-semibold mb-2 text-gray-700 dark:text-gray-100 flex items-center gap-2">
+						<HiOutlineHashtag /> Tendencias
+					</div>
+					<div className="flex flex-wrap gap-2">
+						{trends.map((t, i) => (
+							<span
+								key={i}
+								className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 px-2 py-1 rounded-full text-xs font-medium"
+							>
+								{t}
+							</span>
+						))}
+					</div>
+				</div>
+			</div>
+			
+			{/* Modal de conversaciones flotante */}
+			{showConversations && (
+				<div className="fixed inset-0 z-50 flex items-start justify-end pointer-events-none">
+					<div
+						className="absolute inset-0 bg-black bg-opacity-40 pointer-events-auto"
+						onClick={() => setShowConversations(false)}
+					/>
+					<aside
+						className="relative mt-8 mr-8 w-[min(22rem,90vw)] max-w-full h-[80vh] bg-white dark:bg-gray-900 shadow-2xl rounded-xl z-50 flex flex-col pointer-events-auto border dark:border-gray-800 animate-fade-in transition-transform duration-300"
+						style={{ minWidth: '18rem', transform: showConversations ? 'translateY(0)' : 'translateY(100%)' }}
+					>
+						{/* Barra para arrastrar/minimizar */}
+						<div
+							className="w-full flex justify-center items-center cursor-pointer py-2"
+							onClick={() => setShowConversations(false)}
+						>
+							<div className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-700" />
+						</div>
+						<ConversationsList onSelectUser={handleSelectUser} />
+					</aside>
+				</div>
+			)}
+		</>
+	);
 };
 
-export default HomePage;
+export default RightSidebar;

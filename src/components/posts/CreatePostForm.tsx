@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FileText, Mic, Send, Camera, Paperclip, Image, Music, Video } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { PostType, usePostStore } from '../../store/postStore';
@@ -9,6 +9,9 @@ import VideoRecorder from '../ui/VideoRecorder';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { supabase } from '../../lib/supabase';
+import MediaCarousel, { MediaItem } from './subcomponents/MediaCarousel';
+import LinkPreview, { LinkData } from './subcomponents/LinkPreview';
+import Poll, { PollData } from './subcomponents/Poll';
 
 interface CreatePostFormProps {
   onSuccess?: () => void;
@@ -33,6 +36,15 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const [previewFiles, setPreviewFiles] = useState<Array<{ url: string; type: string; name: string }>>([]);
   const [modalText, setModalText] = useState('');
   const [showModalEmojiPicker, setShowModalEmojiPicker] = useState(false);
+
+  // Estado para encuestas
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [showPoll, setShowPoll] = useState(false);
+  // Estado para fondo de color
+  const [backgroundColor, setBackgroundColor] = useState<string | undefined>(undefined);
+  // Estado para preview de link enriquecido
+  const [linkData, setLinkData] = useState<LinkData | null>(null);
 
   const { user } = useAuthStore();
   const { addPost } = usePostStore();
@@ -190,13 +202,28 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   };
 
   // Handler para subir el video/foto
-  const handleUploadCameraMedia = () => {
+  const handleUploadCameraMedia = async () => {
     if (cameraPreviewUrl && cameraPreviewType) {
-      setMediaUrls([{ url: cameraPreviewUrl, type: cameraPreviewType, name: '' }]);
-      setPostType(cameraPreviewType);
-      setShowCameraModal(false);
-      setCameraPreviewUrl(null);
-      setCameraPreviewType(null);
+      setIsSubmitting(true);
+      try {
+        // Subir archivo a Supabase Storage y obtener URL pública
+        const response = await fetch(cameraPreviewUrl);
+        const blob = await response.blob();
+        const ext = cameraPreviewType === 'image' ? 'jpg' : 'mp4';
+        const filePath = `posts/${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+        const { error } = await supabase.storage.from('media').upload(filePath, blob);
+        if (error) throw error;
+        const { data: urlData } = supabase.storage.from('media').getPublicUrl(filePath);
+        setMediaUrls([{ url: urlData.publicUrl, type: cameraPreviewType, name: '' }]);
+        setPostType(cameraPreviewType);
+        setShowCameraModal(false);
+        setCameraPreviewUrl(null);
+        setCameraPreviewType(null);
+      } catch (err) {
+        toast.error('Error al subir archivo de cámara');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
   const handleCancelCameraModal = () => {
@@ -224,6 +251,10 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
   const handleAttachFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    if (files.length + previewFiles.length > 10) {
+      toast.error('Solo puedes adjuntar hasta 10 archivos.');
+      return;
+    }
     const newFiles = Array.from(files).map(file => {
       const url = URL.createObjectURL(file);
       let type = 'document';
@@ -231,6 +262,18 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
       else if (file.type.startsWith('video/')) type = 'video';
       else if (file.type.startsWith('audio/')) type = 'audio';
       return { url, type, name: file.name };
+    });
+    // Validar duración de video si es video
+    newFiles.forEach(file => {
+      if (file.type === 'video') {
+        const video = document.createElement('video');
+        video.src = file.url;
+        video.onloadedmetadata = () => {
+          if (video.duration > 90) {
+            toast.error('El video no puede durar más de 90 segundos.');
+          }
+        };
+      }
     });
     setPreviewFiles(prev => [...prev, ...newFiles]);
     setShowPreviewModal(true);
@@ -316,6 +359,22 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
       setAudioPreviewUrl(null);
     }
   };
+
+  // Detectar enlaces y obtener preview enriquecido (mock, deberías usar un fetch real)
+  useEffect(() => {
+    const urlMatch = content.match(/(https?:\/\/[\w\-\.\/\?#&=;%+~]+)|(www\.[\w\-\.\/\?#&=;%+~]+)/gi);
+    if (urlMatch && urlMatch[0]) {
+      // Aquí deberías hacer un fetch a un API de link preview
+      setLinkData({
+        url: urlMatch[0],
+        image: '/vite.svg',
+        title: 'Título de ejemplo',
+        description: 'Descripción de ejemplo',
+      });
+    } else {
+      setLinkData(null);
+    }
+  }, [content]);
 
   return (
     <div className="feed-item mb-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm rounded-none sm:rounded-lg mx-0 sm:mx-auto p-0 sm:p-0">
@@ -433,7 +492,7 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
               aria-label="Contenido de la publicación"
               required={!mediaUrls.length}
               disabled={isSubmitting}
-              style={{height: 'auto', boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)'}}
+              style={{height: 'auto', boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)', backgroundColor: backgroundColor || undefined}}
               onInput={e => {
                 const target = e.target as HTMLTextAreaElement;
                 target.style.height = 'auto';
@@ -619,6 +678,18 @@ const CreatePostForm: React.FC<CreatePostFormProps> = ({ onSuccess }) => {
             </div>
           </div>
         )}
+        {/* Muestra el carrusel de medios si hay archivos en previewFiles */}
+        {previewFiles.length > 0 && (
+          <div className="px-4 py-2">
+            <MediaCarousel media={previewFiles as MediaItem[]} />
+          </div>
+        )}
+        {/* Muestra la encuesta si está activa y tiene al menos 2 opciones */}
+        {showPoll && pollOptions.filter(opt => opt.trim()).length >= 2 && pollQuestion.trim() && (
+          <Poll poll={{ question: pollQuestion, options: pollOptions.map((text, i) => ({ id: String(i), text, votes: 0 })), totalVotes: 0 }} onVote={() => {}} />
+        )}
+        {/* Preview de link enriquecido si hay un enlace en el contenido */}
+        {linkData && <LinkPreview link={linkData} />}
       </form>
     </div>
   );

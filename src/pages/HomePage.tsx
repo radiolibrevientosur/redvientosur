@@ -173,7 +173,37 @@ const HomePage = () => {
         <div className="w-full">
           {sortedFeed.map((item) => {
             if (item.type === 'post' && 'post' in item) {
-              return <PostCard key={item.post.id} post={item.post} onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== item.post.id))} />;
+              const post = item.post;
+              return (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  user={{
+                    nombre: post.autor?.displayName || 'Usuario',
+                    avatar: post.autor?.avatar || '/default-avatar.png',
+                    verificado: post.autor?.verificado || false
+                  }}
+                  date={post.createdAt}
+                  media={post.mediaUrls}
+                  text={post.content}
+                  backgroundColor={post.backgroundColor}
+                  linkData={post.linkData}
+                  pollData={post.pollData}
+                  stats={{
+                    likes: post.likes?.length || 0,
+                    comentarios: post.comments?.length || 0,
+                    compartidos: post.shares || 0,
+                    votos: post.pollData?.totalVotes || 0
+                  }}
+                  onLike={() => usePostStore.getState().toggleLike(post.id, post.userId)}
+                  onComment={() => {}}
+                  onShare={() => {}}
+                  onVote={() => {}}
+                  onFavorite={() => usePostStore.getState().toggleFavorite(post.id)}
+                  actions={[]}
+                  onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== post.id))}
+                />
+              );
             }
             if (item.type === 'event' && 'event' in item) {
               return <EventoCulturalCard key={item.event.id} event={{

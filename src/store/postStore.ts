@@ -168,23 +168,19 @@ export const usePostStore = create<PostState>((set, get) => ({
   },
   
   toggleLike: async (postId, userId) => {
+    set({ isLoading: true });
     try {
       const post = get().posts.find(p => p.id === postId);
       if (!post) return;
-
       const isLiked = post.likes.includes(userId);
-
       if (isLiked) {
-        // Remove like
         const { error } = await supabase
           .from('reacciones_post')
           .delete()
           .eq('post_id', postId)
           .eq('usuario_id', userId);
-
         if (error) throw error;
       } else {
-        // Add like
         const { error } = await supabase
           .from('reacciones_post')
           .insert({
@@ -192,11 +188,8 @@ export const usePostStore = create<PostState>((set, get) => ({
             usuario_id: userId,
             tipo: 'like'
           });
-
         if (error) throw error;
       }
-
-      // Update local state
       set(state => ({
         posts: state.posts.map(p => 
           p.id === postId
@@ -207,15 +200,36 @@ export const usePostStore = create<PostState>((set, get) => ({
                   : [...p.likes, userId]
               }
             : p
-        )
+        ),
+        isLoading: false
       }));
     } catch (error) {
+      set({ isLoading: false });
       toast.error('Error al actualizar reacción');
     }
   },
-  
+
   addComment: async (postId, userId, content) => {
+    set({ isLoading: true });
     try {
+      // Validar que el usuario existe en la tabla usuarios
+      const { data: existingUser, error: userError } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('id', userId)
+        .single();
+      if (userError || !existingUser) {
+        // Intentar crear el usuario con datos mínimos
+        const { error: insertError } = await supabase.from('usuarios').insert([
+          {
+            id: userId,
+            nombre_usuario: userId.slice(0, 8),
+            nombre_completo: 'Usuario',
+            avatar_url: ''
+          }
+        ]);
+        if (insertError) throw insertError;
+      }
       const { data, error } = await supabase
         .from('comentarios_post')
         .insert({
@@ -225,76 +239,81 @@ export const usePostStore = create<PostState>((set, get) => ({
         })
         .select()
         .single();
-
       if (error) throw error;
-
-      const newComment: Comment = {
-        id: data.id,
-        userId: data.autor_id,
-        content: data.contenido,
-        createdAt: data.creado_en
-      };
-
+      // Evitar duplicados en comentarios
       set(state => ({
-        posts: state.posts.map(post =>
-          post.id === postId
-            ? { ...post, comments: [...post.comments, newComment] }
-            : post
-        )
+        posts: state.posts.map(p => 
+          p.id === postId
+            ? {
+                ...p,
+                comments: p.comments.some(c => c.id === data.id)
+                  ? p.comments
+                  : [...p.comments, {
+                      id: data.id,
+                      userId: data.autor_id,
+                      content: data.contenido,
+                      createdAt: data.creado_en
+                    }]
+              }
+            : p
+        ),
+        isLoading: false
       }));
-      
-      toast.success('Comentario agregado');
+      toast.success('¡Comentario agregado!');
     } catch (error) {
+      set({ isLoading: false });
       toast.error('Error al agregar comentario');
     }
   },
-  
+
   toggleFavorite: async (postId) => {
+    set({ isLoading: true });
     try {
       const post = get().posts.find(p => p.id === postId);
       if (!post) return;
-
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user) return;
-
-      if (post.isFavorite) {
-        // Remove from favorites
+      const isFavorited = post.isFavorite;
+      if (isFavorited) {
         const { error } = await supabase
           .from('favoritos_post')
           .delete()
-          .eq('post_id', postId)
-          .eq('usuario_id', session.session.user.id);
-
+          .eq('post_id', postId);
         if (error) throw error;
       } else {
-        // Add to favorites
         const { error } = await supabase
           .from('favoritos_post')
           .insert({
-            post_id: postId,
-            usuario_id: session.session.user.id
+            post_id: postId
           });
-
         if (error) throw error;
       }
-
-      // Update local state
       set(state => ({
-        posts: state.posts.map(p =>
+        posts: state.posts.map(p => 
           p.id === postId
-            ? { ...p, isFavorite: !p.isFavorite }
+            ? {
+                ...p,
+                isFavorite: !isFavorited
+              }
             : p
-        )
+        ),
+        isLoading: false
       }));
+      toast.success(isFavorited ? '¡Publicación desmarcada como favorita!' : '¡Publicación marcada como favorita!');
     } catch (error) {
-      toast.error('Error al actualizar favoritos');
+      set({ isLoading: false });
+      toast.error('Error al actualizar favorito');
     }
   },
-  
+
   getFavoritePosts: () => {
-    return get().posts.filter(post => post.isFavorite);
+    const { posts } = get();
+    return posts.filter(post => post.isFavorite);
   }
 }));
+
+// Helper function to format post date
+export const formatPostDate = (dateString: string) => {
+  return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+};
 
 // Helper function to get user by ID
 export const getUserById = async (userId: string) => {
@@ -312,9 +331,4 @@ export const getUserById = async (userId: string) => {
     displayName: data.nombre_completo,
     avatar: data.avatar_url
   };
-};
-
-// Helper function to format post date
-export const formatPostDate = (dateString: string) => {
-  return formatDistanceToNow(new Date(dateString), { addSuffix: true });
 };

@@ -84,7 +84,6 @@ const HomePage = () => {
       {/* Formulario para crear post */}
       <div className="w-full">
         <CreatePostForm 
-          className="rounded-none mx-0"
           onSuccess={() => {
             setTimeout(() => {
               const firstPost = document.querySelector('.feed-item');
@@ -179,28 +178,13 @@ const HomePage = () => {
                   key={post.id}
                   post={post}
                   user={{
-                    nombre: post.autor?.displayName || 'Usuario',
-                    avatar: post.autor?.avatar || '/default-avatar.png',
-                    verificado: post.autor?.verificado || false
+                    id: post.userId,
+                    nombre: 'Usuario',
+                    avatar: '/default-avatar.png',
+                    verificado: false
                   }}
-                  date={post.createdAt}
-                  media={post.mediaUrls}
+                  media={post.mediaUrls?.map(m => ({ url: m.url, type: 'image', aspectRatio: '1:1', name: m.name }))}
                   text={post.content}
-                  backgroundColor={post.backgroundColor}
-                  linkData={post.linkData}
-                  pollData={post.pollData}
-                  stats={{
-                    likes: post.likes?.length || 0,
-                    comentarios: post.comments?.length || 0,
-                    compartidos: post.shares || 0,
-                    votos: post.pollData?.totalVotes || 0
-                  }}
-                  onLike={() => usePostStore.getState().toggleLike(post.id, post.userId)}
-                  onComment={() => {}}
-                  onShare={() => {}}
-                  onVote={() => {}}
-                  onFavorite={() => usePostStore.getState().toggleFavorite(post.id)}
-                  actions={[]}
                   onDeleted={() => setLocalPosts((prev) => prev.filter((p) => p.id !== post.id))}
                 />
               );

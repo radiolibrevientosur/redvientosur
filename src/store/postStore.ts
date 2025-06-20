@@ -50,7 +50,7 @@ export const usePostStore = create<PostState>((set, get) => ({
   posts: [],
   isLoading: false,
   error: null,
-  
+
   fetchPosts: async () => {
     set({ isLoading: true, error: null });
     try {
@@ -58,24 +58,23 @@ export const usePostStore = create<PostState>((set, get) => ({
         .from('posts')
         .select(`
           *,
-          autor:usuarios(*),
-          comentarios:comentarios_post(*, reacciones:reacciones_comentario(*)),
+          comentarios:comentarios_post(*),
           reacciones:reacciones_post(*)
         `)
         .order('creado_en', { ascending: false });
 
+      // Log de depuración
+      // eslint-disable-next-line no-console
+      console.log('fetchPosts: resultado de Supabase', { posts, error });
+
       if (error) throw error;
+      if (!posts || posts.length === 0) {
+        // eslint-disable-next-line no-console
+        console.warn('fetchPosts: No se recibieron posts desde Supabase');
+      }
 
       // Transform data to match Post interface
-      const transformedPosts: Post[] = await Promise.all(posts.map(async (post) => {
-        // Check if post is favorited by current user
-        const { data: favorite } = await supabase
-          .from('favoritos_post')
-          .select('*')
-          .eq('post_id', post.id)
-          .single();
-
-        // Soporte para media_urls enriquecido
+      const transformedPosts: Post[] = posts.map((post: any) => {
         let mediaUrls: Array<{ url: string; type: string; name: string }> = [];
         if (post.media_urls) {
           try {
@@ -84,10 +83,8 @@ export const usePostStore = create<PostState>((set, get) => ({
             mediaUrls = [];
           }
         } else if (post.multimedia_url && Array.isArray(post.multimedia_url)) {
-          // Fallback retrocompatible: solo url plano, tipo image
           mediaUrls = post.multimedia_url.map((url: string) => ({ url, type: 'image', name: '' }));
         }
-
         return {
           id: post.id,
           userId: post.autor_id,
@@ -96,24 +93,21 @@ export const usePostStore = create<PostState>((set, get) => ({
           mediaUrl: post.multimedia_url?.[0],
           mediaUrls,
           createdAt: post.creado_en,
-          likes: post.reacciones.map((r: any) => r.usuario_id),
-          comments: post.comentarios.map((c: any) => ({
+          likes: post.reacciones ? post.reacciones.map((r: any) => r.usuario_id) : [],
+          comments: post.comentarios ? post.comentarios.map((c: any) => ({
             id: c.id,
             userId: c.autor_id,
             content: c.contenido,
             createdAt: c.creado_en,
-            reactions: Array.isArray(c.reacciones) ? c.reacciones.map((r: any) => ({
-              id: r.id,
-              comentario_id: r.comentario_id,
-              usuario_id: r.usuario_id,
-              tipo: r.tipo
-            })) : []
-          })),
-          isFavorite: !!favorite
+            reactions: [] // No se traen reacciones de comentarios en esta versión simplificada
+          })) : [],
+          isFavorite: false // No se traen favoritos en esta versión simplificada
         };
-      }));
+      });
 
       set({ posts: transformedPosts, isLoading: false });
+      // eslint-disable-next-line no-console
+      console.log('fetchPosts: posts seteados en el store', transformedPosts);
     } catch (error) {
       set({ 
         error: error instanceof Error ? error.message : 'Error al cargar posts', 

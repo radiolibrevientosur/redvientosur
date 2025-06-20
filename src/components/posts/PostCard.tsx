@@ -84,6 +84,14 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     return () => { isMounted = false; };
   }, [post.comments, user]);
 
+  // Sincronizar likes y comentarios con props.post
+  useEffect(() => {
+    setLikes(post.likes);
+    setComments(post.comments);
+    setIsLiked(currentUser ? post.likes.includes(currentUser.id) : false);
+    setIsFavorite(post.isFavorite);
+  }, [post, currentUser]);
+
   // Reacción (like)
   const handleLike = async () => {
     if (!currentUser || isLoadingReaction) return;
@@ -263,13 +271,13 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     const prev = commentReactions[comment.id] || { isReacted: false, likesCount: 0 };
     try {
       if (prev.isReacted) {
-        await supabase.from('reacciones_comentario').delete().eq('comentario_id', comment.id).eq('usuario_id', currentUser.id);
+        await supabase.from('reacciones_comentario_post').delete().eq('comentario_id', comment.id).eq('usuario_id', currentUser.id);
         setCommentReactions({
           ...commentReactions,
           [comment.id]: { isReacted: false, likesCount: Math.max(0, prev.likesCount - 1) }
         });
       } else {
-        await supabase.from('reacciones_comentario').insert({ comentario_id: comment.id, usuario_id: currentUser.id, tipo: 'like' });
+        await supabase.from('reacciones_comentario_post').insert({ comentario_id: comment.id, usuario_id: currentUser.id, tipo: 'like' });
         setCommentReactions({
           ...commentReactions,
           [comment.id]: { isReacted: true, likesCount: prev.likesCount + 1 }
@@ -279,6 +287,18 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       toast.error('Error al reaccionar');
     }
   };
+  
+  // Log de depuración para detectar datos vacíos
+  useEffect(() => {
+    if (!post || !post.id) {
+      // eslint-disable-next-line no-console
+      console.warn('PostCard: post vacío o sin id', post);
+    }
+    if (!user || !user.id) {
+      // eslint-disable-next-line no-console
+      console.warn('PostCard: user vacío o sin id', user);
+    }
+  }, [post, user]);
   
   if (!post || !postUser) {
     return null;

@@ -18,11 +18,19 @@ export interface Post {
   isFavorite: boolean;
 }
 
+export interface CommentReaction {
+  id: string;
+  comentario_id: string;
+  usuario_id: string;
+  tipo: string; // 'like', 'love', etc.
+}
+
 export interface Comment {
   id: string;
   userId: string;
   content: string;
   createdAt: string;
+  reactions?: CommentReaction[];
 }
 
 interface PostState {
@@ -51,7 +59,7 @@ export const usePostStore = create<PostState>((set, get) => ({
         .select(`
           *,
           autor:usuarios(*),
-          comentarios:comentarios_post(*),
+          comentarios:comentarios_post(*, reacciones:reacciones_comentario(*)),
           reacciones:reacciones_post(*)
         `)
         .order('creado_en', { ascending: false });
@@ -93,7 +101,13 @@ export const usePostStore = create<PostState>((set, get) => ({
             id: c.id,
             userId: c.autor_id,
             content: c.contenido,
-            createdAt: c.creado_en
+            createdAt: c.creado_en,
+            reactions: Array.isArray(c.reacciones) ? c.reacciones.map((r: any) => ({
+              id: r.id,
+              comentario_id: r.comentario_id,
+              usuario_id: r.usuario_id,
+              tipo: r.tipo
+            })) : []
           })),
           isFavorite: !!favorite
         };
@@ -272,17 +286,21 @@ export const usePostStore = create<PostState>((set, get) => ({
       const post = get().posts.find(p => p.id === postId);
       if (!post) return;
       const isFavorited = post.isFavorite;
+      const currentUser = require('../store/authStore').useAuthStore.getState().user;
+      if (!currentUser) throw new Error('No hay usuario autenticado');
       if (isFavorited) {
         const { error } = await supabase
           .from('favoritos_post')
           .delete()
-          .eq('post_id', postId);
+          .eq('post_id', postId)
+          .eq('usuario_id', currentUser.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('favoritos_post')
           .insert({
-            post_id: postId
+            post_id: postId,
+            usuario_id: currentUser.id
           });
         if (error) throw error;
       }

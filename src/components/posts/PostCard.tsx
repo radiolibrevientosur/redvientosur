@@ -11,41 +11,27 @@ import ReactDOM from 'react-dom';
 import MediaCarousel, { MediaItem } from './subcomponents/MediaCarousel';
 import LinkPreview, { LinkData } from './subcomponents/LinkPreview';
 import Poll, { PollData } from './subcomponents/Poll';
-import PostActions from './subcomponents/PostActions';
-import PostMenu from './subcomponents/PostMenu';
 
 interface PostCardProps {
   post: Post;
   disableCardNavigation?: boolean;
   onDeleted?: () => void;
-  user: { nombre: string; avatar: string; verificado?: boolean };
-  date: string;
+  user: { nombre: string; avatar: string; verificado?: boolean; id?: string };
   media?: MediaItem[];
   text: string;
   backgroundColor?: string;
   linkData?: LinkData;
   pollData?: PollData;
-  stats: { likes: number; comentarios: number; compartidos: number; votos?: number };
-  onLike: () => void;
-  onComment: () => void;
-  onShare: () => void;
   onVote?: (optionId: string) => void;
-  actions?: { label: string; onClick: () => void; danger?: boolean }[];
 }
 
-const urlRegex = /(https?:\/\/[\w\-\.\/?#&=;%+~]+)|(www\.[\w\-\.\/?#&=;%+~]+)/gi;
-
-// NUEVO: Sistema robusto de reacciones, comentarios y compartir
-const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDeleted, user, date, media, text, backgroundColor, linkData, pollData, stats, onLike, onComment, onShare, onVote, actions }) => {
+const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDeleted, user, media, text, backgroundColor, linkData, pollData, onVote }) => {
   const [isCommentExpanded, setIsCommentExpanded] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [postUser, setPostUser] = useState<any>(null);
   const [commentUsers, setCommentUsers] = useState<Record<string, any>>({});
   const [loadingUser, setLoadingUser] = useState(true);
-  const [loadingComments, setLoadingComments] = useState(true);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -58,7 +44,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
   const [isLoadingReaction, setIsLoadingReaction] = useState(false);
   const [isLoadingComment, setIsLoadingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
-  const [shareSuccess, setShareSuccess] = useState(false);
 
   // Cargar usuario del post
   useEffect(() => {
@@ -77,7 +62,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
   // Cargar usuarios de los comentarios
   useEffect(() => {
     let isMounted = true;
-    setLoadingComments(true);
     (async () => {
       const ids = Array.from(new Set(post.comments
         .map(c => c.userId)
@@ -95,7 +79,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       }));
       if (isMounted) {
         setCommentUsers(users);
-        setLoadingComments(false);
       }
     })();
     return () => { isMounted = false; };
@@ -226,10 +209,74 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     });
   };
   
-  // Asegura que handleFavorite esté definido correctamente
-  const handleFavorite = () => {
-    if (typeof onFavorite === 'function') {
-      onFavorite();
+  // Estados y funciones para edición y reacciones de comentarios
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [commentReactions, setCommentReactions] = useState<Record<string, { isReacted: boolean; likesCount: number }>>({});
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const reactions: Record<string, { isReacted: boolean; likesCount: number }> = {};
+    comments.forEach(comment => {
+      if (Array.isArray(comment.reactions)) {
+        reactions[comment.id] = {
+          isReacted: comment.reactions.some(r => r.tipo === 'like' && r.usuario_id === currentUser.id),
+          likesCount: comment.reactions.filter(r => r.tipo === 'like').length
+        };
+      } else {
+        reactions[comment.id] = { isReacted: false, likesCount: 0 };
+      }
+    });
+    setCommentReactions(reactions);
+  }, [comments, currentUser]);
+
+  const startEditComment = (commentId: string, content: string) => {
+    setEditingCommentId(commentId);
+    setEditingCommentText(content);
+  };
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+  };
+  const saveEditComment = async (comment: any) => {
+    if (!editingCommentText.trim()) return;
+    try {
+      await supabase.from('comentarios_post').update({ contenido: editingCommentText }).eq('id', comment.id);
+      setComments(comments.map(c => c.id === comment.id ? { ...c, content: editingCommentText } : c));
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    } catch {
+      toast.error('Error al editar comentario');
+    }
+  };
+  const handleDeleteComment = async (comment: any) => {
+    if (!window.confirm('¿Eliminar este comentario?')) return;
+    try {
+      await supabase.from('comentarios_post').delete().eq('id', comment.id);
+      setComments(comments.filter(c => c.id !== comment.id));
+    } catch {
+      toast.error('Error al eliminar comentario');
+    }
+  };
+  const handleCommentLike = async (comment: any) => {
+    if (!currentUser) return;
+    const prev = commentReactions[comment.id] || { isReacted: false, likesCount: 0 };
+    try {
+      if (prev.isReacted) {
+        await supabase.from('reacciones_comentario').delete().eq('comentario_id', comment.id).eq('usuario_id', currentUser.id);
+        setCommentReactions({
+          ...commentReactions,
+          [comment.id]: { isReacted: false, likesCount: Math.max(0, prev.likesCount - 1) }
+        });
+      } else {
+        await supabase.from('reacciones_comentario').insert({ comentario_id: comment.id, usuario_id: currentUser.id, tipo: 'like' });
+        setCommentReactions({
+          ...commentReactions,
+          [comment.id]: { isReacted: true, likesCount: prev.likesCount + 1 }
+        });
+      }
+    } catch {
+      toast.error('Error al reaccionar');
     }
   };
   
@@ -351,12 +398,12 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       
       {/* Post Media */}
       {media && media.length > 0 && (
-        <MediaCarousel media={media} onOpenLightbox={setLightboxIndex} />
+        <MediaCarousel media={media} />
       )}
       {/* Link Preview */}
       {linkData && <LinkPreview link={linkData} />}
       {/* Poll */}
-      {pollData && <Poll poll={pollData} onVote={onVote} />}
+      {pollData && <Poll poll={pollData} onVote={onVote ?? (() => {})} />}
       
       {/* Post Content (TEXTO) debajo del media */}
       <div className="px-4 pb-3 pt-2" style={backgroundColor ? { backgroundColor } : {}}>
@@ -394,15 +441,17 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
           {comments.length > 0 && (
             <div className="mb-3 space-y-3">
               {comments.slice(0, isCommentExpanded ? undefined : 2).map(comment => {
-                // Obtener datos de usuario del comentario
                 const commentUser = comment.userId === (currentUser && currentUser.id) ? currentUser : commentUsers[comment.userId];
+                const isOwnComment = currentUser && comment.userId === currentUser.id;
+                const reaction = commentReactions[comment.id] || { isReacted: false, likesCount: 0 };
+                const isEditing = editingCommentId === comment.id;
                 return (
                   <div key={comment.id} className="flex space-x-2 animate-fade-in">
                     <div className="flex-shrink-0">
                       <div className="avatar w-9 h-9 border-2 border-primary-200 dark:border-primary-700 shadow-sm">
                         <img 
-                          src={commentUser?.avatar || commentUser?.avatar_url || '/default-avatar.png'} 
-                          alt={commentUser?.displayName || commentUser?.nombre_completo || 'Usuario'} 
+                          src={commentUser?.avatar || '/default-avatar.png'} 
+                          alt={commentUser?.displayName || 'Usuario'} 
                           className="avatar-img rounded-full object-cover"
                         />
                       </div>
@@ -410,11 +459,37 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
                     <div className="flex-1">
                       <div className="bg-white dark:bg-gray-900 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
                         <p className="font-semibold text-sm text-gray-900 dark:text-white mb-0.5">
-                          {commentUser?.displayName || commentUser?.nombre_completo || 'Usuario'}
+                          {commentUser?.displayName || 'Usuario'}
                         </p>
-                        <p className="text-sm text-gray-700 dark:text-gray-300 break-words">
-                          {comment.content}
-                        </p>
+                        {isEditing ? (
+                          <div className="flex items-center gap-2">
+                            <input
+                              className="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1"
+                              value={editingCommentText}
+                              onChange={e => setEditingCommentText(e.target.value)}
+                              maxLength={300}
+                            />
+                            <button onClick={() => saveEditComment(comment)} className="text-primary-600 dark:text-primary-400 text-xs font-bold">Guardar</button>
+                            <button onClick={cancelEditComment} className="text-xs text-gray-400">Cancelar</button>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-700 dark:text-gray-300 break-words">
+                            {comment.content}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 mt-1">
+                          <button onClick={() => handleCommentLike(comment)} className="flex items-center text-xs text-gray-500 hover:text-primary-500">
+                            <Heart className={`w-4 h-4 mr-1 ${reaction.isReacted ? 'text-red-500 fill-red-500' : ''}`} />
+                            {reaction.likesCount > 0 && <span>{reaction.likesCount}</span>}
+                          </button>
+                          <button onClick={() => { setCommentText(`@${commentUser?.displayName || 'Usuario'} `); setIsCommentExpanded(true); commentInputRef.current?.focus(); }} className="text-xs text-gray-500 hover:text-primary-500">Responder</button>
+                          {isOwnComment && !isEditing && (
+                            <>
+                              <button onClick={() => startEditComment(comment.id, comment.content)} className="text-xs text-gray-500 hover:text-primary-500">Editar</button>
+                              <button onClick={() => handleDeleteComment(comment)} className="text-xs text-red-500 hover:underline">Eliminar</button>
+                            </>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-gray-400 mt-1 pl-2">
                         {formatPostDate(comment.createdAt)}
@@ -437,8 +512,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
             <form onSubmit={handleComment} className="flex items-center space-x-2 relative mt-2">
               <div className="avatar w-9 h-9">
                 <img 
-                  src={currentUser.avatar || currentUser.avatar_url || '/default-avatar.png'} 
-                  alt={currentUser.displayName || currentUser.nombre_completo || 'Usuario'} 
+                  src={currentUser.avatar || '/default-avatar.png'} 
+                  alt={currentUser.displayName || 'Usuario'} 
                   className="avatar-img rounded-full object-cover border border-primary-200 dark:border-primary-700"
                 />
               </div>

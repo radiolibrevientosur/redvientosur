@@ -11,6 +11,9 @@ import ReactDOM from 'react-dom';
 import MediaCarousel, { MediaItem } from './subcomponents/MediaCarousel';
 import LinkPreview, { LinkData } from './subcomponents/LinkPreview';
 import Poll, { PollData } from './subcomponents/Poll';
+import CommentThread, { CommentData } from '../shared/CommentThread';
+import ReactionsBar, { ReactionData } from '../shared/ReactionsBar';
+import { useDebounce } from 'use-debounce';
 
 interface PostCardProps {
   post: Post;
@@ -44,6 +47,10 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
   const [isLoadingReaction, setIsLoadingReaction] = useState(false);
   const [isLoadingComment, setIsLoadingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionResults, setMentionResults] = useState<any[]>([]);
+  const [showMentionList, setShowMentionList] = useState(false);
+  const [debouncedMentionQuery] = useDebounce(mentionQuery, 200);
 
   // Cargar usuario del post
   useEffect(() => {
@@ -59,30 +66,33 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     return () => { isMounted = false; };
   }, [post.userId]);
 
-  // Cargar usuarios de los comentarios
+  // Optimización: carga de usuarios de comentarios con cache y fallback
   useEffect(() => {
     let isMounted = true;
+    const users: Record<string, any> = {};
+    const ids = Array.from(new Set(comments
+      .map(c => c.userId)
+      .filter(id => typeof id === 'string' && id && id !== 'undefined' && /^[0-9a-fA-F-]{36}$/.test(id))
+    ));
     (async () => {
-      const ids = Array.from(new Set(post.comments
-        .map(c => c.userId)
-        .filter(id => typeof id === 'string' && id && id !== 'undefined' && /^[0-9a-fA-F-]{36}$/.test(id))
-      ));
-      const users: Record<string, any> = {};
       await Promise.all(ids.map(async (id) => {
         if (!id || id === 'undefined') return;
+        if (users[id]) return; // cache local
         if (id === user?.id) {
-          users[id] = user; // Usa el usuario actual si corresponde
+          users[id] = user;
         } else {
-          const u = await getUserById(id);
-          if (u) users[id] = u;
+          try {
+            const u = await getUserById(id);
+            users[id] = u || { displayName: 'Usuario', avatar: '/default-avatar.png' };
+          } catch {
+            users[id] = { displayName: 'Usuario', avatar: '/default-avatar.png' };
+          }
         }
       }));
-      if (isMounted) {
-        setCommentUsers(users);
-      }
+      if (isMounted) setCommentUsers(users);
     })();
     return () => { isMounted = false; };
-  }, [post.comments, user]);
+  }, [comments, user]);
 
   // Sincronizar likes y comentarios con props.post
   useEffect(() => {
@@ -218,8 +228,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
   };
   
   // Estados y funciones para edición y reacciones de comentarios
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingCommentText, setEditingCommentText] = useState('');
   const [commentReactions, setCommentReactions] = useState<Record<string, { isReacted: boolean; likesCount: number }>>({});
 
   useEffect(() => {
@@ -238,30 +246,11 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     setCommentReactions(reactions);
   }, [comments, currentUser]);
 
-  const startEditComment = (commentId: string, content: string) => {
-    setEditingCommentId(commentId);
-    setEditingCommentText(content);
-  };
-  const cancelEditComment = () => {
-    setEditingCommentId(null);
-    setEditingCommentText('');
-  };
-  const saveEditComment = async (comment: any) => {
-    if (!editingCommentText.trim()) return;
-    try {
-      await supabase.from('comentarios_post').update({ contenido: editingCommentText }).eq('id', comment.id);
-      setComments(comments.map(c => c.id === comment.id ? { ...c, content: editingCommentText } : c));
-      setEditingCommentId(null);
-      setEditingCommentText('');
-    } catch {
-      toast.error('Error al editar comentario');
-    }
-  };
-  const handleDeleteComment = async (comment: any) => {
+  const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm('¿Eliminar este comentario?')) return;
     try {
-      await supabase.from('comentarios_post').delete().eq('id', comment.id);
-      setComments(comments.filter(c => c.id !== comment.id));
+      await supabase.from('comentarios_post').delete().eq('id', commentId);
+      setComments(comments.filter(c => c.id !== commentId));
     } catch {
       toast.error('Error al eliminar comentario');
     }
@@ -299,6 +288,88 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       console.warn('PostCard: user vacío o sin id', user);
     }
   }, [post, user]);
+  
+  // Adaptar comentarios y reacciones al formato de los componentes compartidos
+  const commentThreadData: CommentData[] = comments.map(c => ({
+    id: c.id,
+    userId: c.userId,
+    userName: commentUsers[c.userId]?.displayName || 'Usuario',
+    userAvatar: commentUsers[c.userId]?.avatar || '/default-avatar.png',
+    content: c.content,
+    createdAt: c.createdAt,
+    parent_id: c.parent_id || null,
+    replies: [],
+    canEdit: !!(currentUser && c.userId === currentUser.id),
+    canDelete: !!(currentUser && c.userId === currentUser.id)
+  }));
+  const reactionsData: ReactionData[] = [
+    { emoji: '❤️', count: likes.length, reacted: isLiked, id: post.id }, // id de la reacción = id del post para reportar
+    // TODO: mapear otros tipos de reacciones
+  ];
+  
+  // Definir handleEditComment en el scope correcto
+  const handleEditComment = async (commentId: string, newContent: string) => {
+    if (!newContent.trim()) return;
+    try {
+      await supabase.from('comentarios_post').update({ contenido: newContent }).eq('id', commentId);
+      setComments(comments.map(c => c.id === commentId ? { ...c, content: newContent } : c));
+      toast.success('Comentario editado');
+    } catch {
+      toast.error('Error al editar comentario');
+    }
+  };
+
+  // Permitir respuestas anidadas
+  const handleReplyComment = async (parentId: string, content: string) => {
+    if (!currentUser) return;
+    try {
+      const { data, error } = await supabase.from('comentarios_post').insert({ post_id: post.id, autor_id: currentUser.id, contenido: content, parent_id: parentId }).select().single();
+      if (error) throw error;
+      setComments([...comments, { id: data.id, userId: data.autor_id, content: data.contenido, createdAt: data.creado_en, parent_id: data.parent_id }]);
+    } catch {
+      toast.error('Error al responder comentario.');
+    }
+  };
+
+  // Buscar usuarios para autocompletado de menciones
+  useEffect(() => {
+    if (!debouncedMentionQuery) {
+      setMentionResults([]);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('usuarios')
+        .select('id, nombre_usuario, nombre_completo, avatar_url')
+        .ilike('nombre_usuario', `%${debouncedMentionQuery}%`)
+        .limit(5);
+      setMentionResults(data || []);
+    })();
+  }, [debouncedMentionQuery]);
+
+  // Detectar @ para autocompletado
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCommentText(value);
+    setCommentError(null);
+    const match = value.match(/@([\w\d_]{2,})$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setShowMentionList(true);
+    } else {
+      setShowMentionList(false);
+    }
+  };
+
+  // Insertar mención seleccionada
+  const handleMentionSelect = (user: any) => {
+    const regex = /@([\w\d_]{2,})$/;
+    const match = commentText.match(regex);
+    if (!match) return;
+    const before = commentText.slice(0, match.index);
+    setCommentText(before + '@' + user.nombre_usuario + ' ');
+    setShowMentionList(false);
+  };
   
   if (!post || !postUser) {
     return null;
@@ -417,164 +488,103 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       </div>
       
       {/* Post Media */}
-      {media && media.length > 0 && (
-        <MediaCarousel media={media} />
-      )}
+      {media && media.length > 0 && <MediaCarousel media={media} />}
       {/* Link Preview */}
       {linkData && <LinkPreview link={linkData} />}
       {/* Poll */}
       {pollData && <Poll poll={pollData} onVote={onVote ?? (() => {})} />}
-      
       {/* Post Content (TEXTO) debajo del media */}
       <div className="px-4 pb-3 pt-2" style={backgroundColor ? { backgroundColor } : {}}>
-        {/* Aquí puedes usar una función para resaltar hashtags y menciones */}
         <span>{text}</span>
       </div>
-      
-      {/* Depuración: solo una sección de acciones, sin duplicados */}
-      <div className="flex items-center space-x-4 py-2 px-4 justify-between">
-        <div className="flex items-center space-x-6">
-          {/* Like */}
-          <button onClick={handleLike} aria-label="Me gusta" className="flex items-center group" disabled={isLoadingReaction}>
-            <Heart className={`h-5 w-5 ${isLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400 group-hover:text-red-500'}`} />
-            <span className={`text-sm ${isLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400 group-hover:text-red-500'}`}>{likes.length}</span>
-          </button>
-          {/* Comentarios */}
-          <button onClick={() => setIsCommentExpanded(true)} aria-label="Comentarios" className="flex items-center group">
-            <MessageCircle className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-primary-500" />
-            <span className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-primary-500">{comments.length}</span>
-          </button>
-          {/* Compartir */}
-          <button onClick={handleShare} aria-label="Compartir publicación" className="flex items-center group">
-            <Share2 className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-primary-500" />
-          </button>
-          {/* Guardar (favorito) */}
-          <button onClick={() => setIsFavorite(fav => !fav)} aria-label="Guardar publicación" className="flex items-center group">
-            <Bookmark className={`h-5 w-5 ${isFavorite ? 'text-primary-500' : 'text-gray-600 dark:text-gray-400 group-hover:text-primary-500'}`} />
-          </button>
-        </div>
+      <div className="flex items-center gap-2 py-2 px-4 justify-start">
+        <ReactionsBar reactions={reactionsData} onReact={handleLike} reactionKind="post" />
+        <button
+          className="flex items-center gap-1 text-gray-500 hover:text-primary-600 text-sm font-medium focus:outline-none"
+          onClick={() => setIsCommentExpanded((v) => !v)}
+          aria-label="Mostrar comentarios"
+          type="button"
+        >
+          <MessageCircle className="w-5 h-5" />
+          {comments.length > 0 && (
+            <span className="ml-1 text-xs bg-gray-200 dark:bg-gray-700 rounded-full px-2 py-0.5">{comments.length}</span>
+          )}
+        </button>
       </div>
-      
-      {/* Comments */}
       {(comments.length > 0 || isCommentExpanded) && (
         <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl border-t border-gray-200 dark:border-gray-700 transition-all duration-300">
-          {comments.length > 0 && (
-            <div className="mb-3 space-y-3">
-              {comments.slice(0, isCommentExpanded ? undefined : 2).map(comment => {
-                const commentUser = comment.userId === (currentUser && currentUser.id) ? currentUser : commentUsers[comment.userId];
-                const isOwnComment = currentUser && comment.userId === currentUser.id;
-                const reaction = commentReactions[comment.id] || { isReacted: false, likesCount: 0 };
-                const isEditing = editingCommentId === comment.id;
-                return (
-                  <div key={comment.id} className="flex space-x-2 animate-fade-in">
-                    <div className="flex-shrink-0">
-                      <div className="avatar w-9 h-9 border-2 border-primary-200 dark:border-primary-700 shadow-sm">
-                        <img 
-                          src={commentUser?.avatar || '/default-avatar.png'} 
-                          alt={commentUser?.displayName || 'Usuario'} 
-                          className="avatar-img rounded-full object-cover"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="bg-white dark:bg-gray-900 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
-                        <p className="font-semibold text-sm text-gray-900 dark:text-white mb-0.5">
-                          {commentUser?.displayName || 'Usuario'}
-                        </p>
-                        {isEditing ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              className="flex-1 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded px-2 py-1"
-                              value={editingCommentText}
-                              onChange={e => setEditingCommentText(e.target.value)}
-                              maxLength={300}
-                            />
-                            <button onClick={() => saveEditComment(comment)} className="text-primary-600 dark:text-primary-400 text-xs font-bold">Guardar</button>
-                            <button onClick={cancelEditComment} className="text-xs text-gray-400">Cancelar</button>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-700 dark:text-gray-300 break-words">
-                            {comment.content}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-3 mt-1">
-                          <button onClick={() => handleCommentLike(comment)} className="flex items-center text-xs text-gray-500 hover:text-primary-500">
-                            <Heart className={`w-4 h-4 mr-1 ${reaction.isReacted ? 'text-red-500 fill-red-500' : ''}`} />
-                            {reaction.likesCount > 0 && <span>{reaction.likesCount}</span>}
-                          </button>
-                          <button onClick={() => { setCommentText(`@${commentUser?.displayName || 'Usuario'} `); setIsCommentExpanded(true); commentInputRef.current?.focus(); }} className="text-xs text-gray-500 hover:text-primary-500">Responder</button>
-                          {isOwnComment && !isEditing && (
-                            <>
-                              <button onClick={() => startEditComment(comment.id, comment.content)} className="text-xs text-gray-500 hover:text-primary-500">Editar</button>
-                              <button onClick={() => handleDeleteComment(comment)} className="text-xs text-red-500 hover:underline">Eliminar</button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1 pl-2">
-                        {formatPostDate(comment.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-              {comments.length > 2 && !isCommentExpanded && (
-                <button 
-                  onClick={() => setIsCommentExpanded(true)}
-                  className="text-sm text-primary-600 dark:text-primary-400 font-medium hover:underline mt-2"
+          <CommentThread
+            comments={commentThreadData}
+            onEdit={handleEditComment}
+            onDelete={handleDeleteComment}
+            onReply={handleReplyComment}
+            currentUserId={currentUser ? currentUser.id : undefined}
+          />
+        </div>
+      )}
+      {currentUser && (
+        <form onSubmit={handleComment} className="flex items-center space-x-2 relative mt-2">
+          <div className="avatar w-9 h-9">
+            <img 
+              src={currentUser.avatar || '/default-avatar.png'} 
+              alt={currentUser.displayName || 'Usuario'} 
+              className="avatar-img rounded-full object-cover border border-primary-200 dark:border-primary-700"
+            />
+          </div>
+          <input
+            type="text"
+            placeholder="Añade un comentario..."
+            className={`flex-1 bg-white dark:bg-gray-900 rounded-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm transition-all ${commentError ? 'border-red-500' : ''}`}
+            value={commentText}
+            onChange={handleInputChange}
+            maxLength={300}
+            autoComplete="off"
+            disabled={isLoadingComment}
+            aria-invalid={!!commentError}
+            ref={commentInputRef}
+          />
+          {/* Lista de menciones */}
+          {showMentionList && mentionResults.length > 0 && (
+            <div className="absolute z-50 bottom-12 left-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg w-64 max-h-60 overflow-y-auto">
+              {mentionResults.map(user => (
+                <button
+                  key={user.id}
+                  className="flex items-center w-full px-3 py-2 hover:bg-primary-50 dark:hover:bg-primary-900/30 gap-2 text-left"
+                  onClick={() => handleMentionSelect(user)}
+                  type="button"
                 >
-                  Ver todos los {comments.length} comentarios
+                  <img src={user.avatar_url || '/default-avatar.png'} alt={user.nombre_usuario} className="w-6 h-6 rounded-full" />
+                  <span className="font-medium">@{user.nombre_usuario}</span>
+                  <span className="text-xs text-gray-400 ml-2">{user.nombre_completo}</span>
                 </button>
-              )}
+              ))}
             </div>
           )}
-          {currentUser && (
-            <form onSubmit={handleComment} className="flex items-center space-x-2 relative mt-2">
-              <div className="avatar w-9 h-9">
-                <img 
-                  src={currentUser.avatar || '/default-avatar.png'} 
-                  alt={currentUser.displayName || 'Usuario'} 
-                  className="avatar-img rounded-full object-cover border border-primary-200 dark:border-primary-700"
-                />
-              </div>
-              <input
-                type="text"
-                placeholder="Añade un comentario..."
-                className={`flex-1 bg-white dark:bg-gray-900 rounded-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 shadow-sm transition-all ${commentError ? 'border-red-500' : ''}`}
-                value={commentText}
-                onChange={(e) => { setCommentText(e.target.value); setCommentError(null); }}
-                maxLength={300}
-                autoComplete="off"
-                disabled={isLoadingComment}
-                aria-invalid={!!commentError}
-              />
-              <button
-                type="button"
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                onClick={() => setShowEmojiPicker((v) => !v)}
-                aria-label="Insertar emoji"
-                tabIndex={-1}
-              >
-                <span role="img" aria-label="emoji">😊</span>
-              </button>
-              <button 
-                type="submit"
-                disabled={!commentText.trim() || isLoadingComment}
-                className="text-sm font-bold text-primary-600 dark:text-primary-400 disabled:opacity-50 px-3 py-1 rounded-full bg-primary-50 dark:bg-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800 transition-all"
-              >
-                {isLoadingComment ? '...' : 'Publicar'}
-              </button>
-              {showEmojiPicker && (
-                <div className="absolute z-50 bottom-12 right-0">
-                  <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />
-                </div>
-              )}
-              {commentError && (
-                <span className="absolute left-0 -bottom-6 text-xs text-red-500 font-medium">{commentError}</span>
-              )}
-            </form>
+          <button
+            type="button"
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+            onClick={() => setShowEmojiPicker((v) => !v)}
+            aria-label="Insertar emoji"
+            tabIndex={-1}
+          >
+            <span role="img" aria-label="emoji">😊</span>
+          </button>
+          <button 
+            type="submit"
+            disabled={!commentText.trim() || isLoadingComment}
+            className="text-sm font-bold text-primary-600 dark:text-primary-400 disabled:opacity-50 px-3 py-1 rounded-full bg-primary-50 dark:bg-primary-900 hover:bg-primary-100 dark:hover:bg-primary-800 transition-all"
+          >
+            {isLoadingComment ? '...' : 'Publicar'}
+          </button>
+          {showEmojiPicker && (
+            <div className="absolute z-50 bottom-12 right-0">
+              <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />
+            </div>
           )}
-        </div>
+          {commentError && (
+            <span className="absolute left-0 -bottom-6 text-xs text-red-500 font-medium">{commentError}</span>
+          )}
+        </form>
       )}
     </article>
   );

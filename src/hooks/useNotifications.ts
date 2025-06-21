@@ -55,6 +55,40 @@ export function useNotifications() {
           link: `/posts/${comment.post_id}`
         });
       })
+      // BLOGS
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'comentarios_blog',
+      }, (payload) => {
+        const comment = payload.new;
+        addNotification({
+          id: `comment-blog-${comment.id}`,
+          type: 'comment',
+          title: 'Nuevo comentario en blog',
+          description: 'Han comentado en uno de tus blogs',
+          createdAt: comment.creado_en,
+          read: false,
+          link: `/blogs/${comment.publicacion_id}`
+        });
+      })
+      // EVENTOS
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'comentarios_evento',
+      }, (payload) => {
+        const comment = payload.new;
+        addNotification({
+          id: `comment-evento-${comment.id}`,
+          type: 'comment',
+          title: 'Nuevo comentario en evento',
+          description: 'Han comentado en uno de tus eventos',
+          createdAt: comment.creado_en,
+          read: false,
+          link: `/eventos/${comment.evento_id}`
+        });
+      })
       .subscribe();
     // Reacciones a posts del usuario
     const reactionChannel = supabase
@@ -73,6 +107,40 @@ export function useNotifications() {
           createdAt: reaction.creado_en,
           read: false,
           link: `/posts/${reaction.post_id}`
+        });
+      })
+      // BLOGS
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'reacciones_blog',
+      }, (payload) => {
+        const reaction = payload.new;
+        addNotification({
+          id: `reaction-blog-${reaction.id}`,
+          type: 'reaction',
+          title: 'Nueva reacción en blog',
+          description: 'A alguien le gustó tu blog',
+          createdAt: reaction.creado_en,
+          read: false,
+          link: `/blogs/${reaction.publicacion_id}`
+        });
+      })
+      // EVENTOS
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'reacciones_evento',
+      }, (payload) => {
+        const reaction = payload.new;
+        addNotification({
+          id: `reaction-evento-${reaction.id}`,
+          type: 'reaction',
+          title: 'Nueva reacción en evento',
+          description: 'A alguien le gustó tu evento',
+          createdAt: reaction.creado_en,
+          read: false,
+          link: `/eventos/${reaction.evento_id}`
         });
       })
       .subscribe();

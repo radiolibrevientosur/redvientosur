@@ -12,6 +12,11 @@ import { toast } from 'sonner';
 import { useAuthStore } from '../../store/authStore';
 import { getUserById } from '../../store/postStore';
 import { Link } from 'react-router-dom';
+import CommentThread, { CommentData } from '../shared/CommentThread';
+import ReactionsBar, { ReactionData } from '../shared/ReactionsBar';
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
+import { useDebounce } from 'use-debounce';
 
 interface EventoCulturalCardProps {
   event: {
@@ -47,6 +52,12 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
   const [commentUsers, setCommentUsers] = useState<Record<string, any>>({});
   const [likes, setLikes] = useState<string[]>([]);
   const [isCommentExpanded, setIsCommentExpanded] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionResults, setMentionResults] = useState<any[]>([]);
+  const [showMentionList, setShowMentionList] = useState(false);
+  const [debouncedMentionQuery] = useDebounce(mentionQuery, 200);
+  const commentInputRef = React.useRef<HTMLTextAreaElement>(null);
   const { user } = useAuthStore();
   const isCreator = user && event.userId && user.id === event.userId;
   const isLiked = user ? likes.includes(user.id) : false;
@@ -82,6 +93,35 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
     fetchComments();
     fetchLikes();
   }, [event.id]);
+
+  // Optimización: carga de usuarios de comentarios con cache y fallback
+  React.useEffect(() => {
+    if (!comments || comments.length === 0) return;
+    let isMounted = true;
+    const users: Record<string, any> = {};
+    const ids = Array.from(new Set(comments
+      .map((c: any) => c.autor_id)
+      .filter(id => typeof id === 'string' && id && id !== 'undefined' && /^[0-9a-fA-F-]{36}$/.test(id))
+    ));
+    (async () => {
+      await Promise.all(ids.map(async (id) => {
+        if (!id || id === 'undefined') return;
+        if (users[id]) return; // cache local
+        if (user && id === user.id) {
+          users[id] = user;
+        } else {
+          try {
+            const userData = await getUserById(id);
+            users[id] = userData || { name: 'Usuario', avatar_url: '/default-avatar.png' };
+          } catch {
+            users[id] = { name: 'Usuario', avatar_url: '/default-avatar.png' };
+          }
+        }
+      }));
+      if (isMounted) setCommentUsers(users);
+    })();
+    return () => { isMounted = false; };
+  }, [comments, user]);
 
   const handleLike = async () => {
     if (!user) return;
@@ -150,6 +190,124 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
       navigator.clipboard.writeText(window.location.origin + '/eventos/' + event.id);
       toast.success('¡Enlace copiado!');
     }
+  };
+
+  // Funciones para edición y borrado de comentarios
+  const handleEditComment = async (commentId: string, newContent: string) => {
+    try {
+      await supabase.from('comentarios_evento').update({ contenido: newContent }).eq('id', commentId);
+      setComments(comments.map(c => c.id === commentId ? { ...c, contenido: newContent } : c));
+      toast.success('Comentario editado');
+    } catch {
+      toast.error('Error al editar comentario');
+    }
+  };
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm('¿Eliminar este comentario?')) return;
+    try {
+      await supabase.from('comentarios_evento').delete().eq('id', commentId);
+      setComments(comments.filter(c => c.id !== commentId));
+      toast.success('Comentario eliminado');
+    } catch {
+      toast.error('Error al eliminar comentario');
+    }
+  };
+
+  // Permitir respuestas anidadas en comentarios de eventos
+  const handleReplyComment = async (parentId: string, content: string) => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('comentarios_evento')
+        .insert({ evento_id: event.id, autor_id: user.id, contenido: content, parent_id: parentId })
+        .select()
+        .single();
+      if (error) throw error;
+      setComments([...comments, data]);
+    } catch {
+      toast.error('Error al responder comentario.');
+    }
+  };
+
+  // Adaptar comentarios y reacciones al formato de los componentes compartidos
+  const commentThreadData: CommentData[] = comments.map(c => ({
+    id: c.id,
+    userId: c.autor_id,
+    userName: commentUsers[c.autor_id]?.name || 'Usuario',
+    userAvatar: commentUsers[c.autor_id]?.avatar_url || '/default-avatar.png',
+    content: c.contenido,
+    createdAt: c.creado_en,
+    parent_id: c.parent_id || null,
+    replies: [],
+    canEdit: !!(user && c.autor_id === user.id),
+    canDelete: !!(user && c.autor_id === user.id)
+  }));
+  const reactionsData: ReactionData[] = [
+    { emoji: '❤️', count: likes.length, reacted: isLiked, id: event.id }, // id de la reacción = id del evento
+    // TODO: mapear otros tipos de reacciones si existen
+  ];
+
+  // Buscar usuarios para autocompletado de menciones
+  React.useEffect(() => {
+    if (!debouncedMentionQuery) {
+      setMentionResults([]);
+      return;
+    }
+    (async () => {
+      const { data: users } = await supabase
+        .from('usuarios')
+        .select('id, nombre_usuario, nombre_completo, avatar_url')
+        .ilike('nombre_usuario', `%${debouncedMentionQuery}%`)
+        .limit(5);
+      setMentionResults(users || []);
+    })();
+  }, [debouncedMentionQuery]);
+
+  // Detectar @ para autocompletado
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNewComment(value);
+    const match = value.match(/@([\w\d_]{2,})$/);
+    if (match) {
+      setMentionQuery(match[1]);
+      setShowMentionList(true);
+    } else {
+      setShowMentionList(false);
+    }
+  };
+
+  // Insertar mención seleccionada
+  const handleMentionSelect = (user: any) => {
+    const regex = /@([\w\d_]{2,})$/;
+    const match = newComment.match(regex);
+    if (!match) return;
+    const before = newComment.slice(0, match.index);
+    setNewComment(before + '@' + user.nombre_usuario + ' ');
+    setShowMentionList(false);
+    setMentionQuery('');
+    setTimeout(() => {
+      if (commentInputRef.current) commentInputRef.current.focus();
+    }, 0);
+  };
+
+  const handleEmojiSelect = (emoji: any) => {
+    if (commentInputRef.current) {
+      const input = commentInputRef.current;
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const newValue =
+        newComment.slice(0, start) +
+        (emoji.native || emoji.skins?.[0]?.native || '') +
+        newComment.slice(end);
+      setNewComment(newValue);
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start + 2, start + 2);
+      }, 0);
+    } else {
+      setNewComment(newComment + (emoji.native || emoji.skins?.[0]?.native || ''));
+    }
+    setShowEmojiPicker(false);
   };
 
   return (
@@ -239,104 +397,76 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
 
         {/* Reacciones y comentarios */}
         <div className="flex items-center space-x-6 mb-4">
-          <button onClick={handleLike} className="flex items-center space-x-1 group focus:outline focus:ring-2 focus:ring-primary-500" aria-pressed={isLiked} aria-label={isLiked ? 'Quitar me gusta' : 'Dar me gusta'} type="button">
-            <Heart className={`h-5 w-5 ${isLiked ? 'text-red-500 fill-red-500' : 'text-gray-600 dark:text-gray-400 group-hover:text-red-500'}`} />
-            <span className={`text-sm ${isLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400 group-hover:text-red-500'}`}>{likes.length}</span>
-          </button>
-          <button onClick={() => setIsCommentExpanded(!isCommentExpanded)} className="flex items-center space-x-1 group focus:outline focus:ring-2 focus:ring-primary-500" aria-expanded={isCommentExpanded} aria-label={isCommentExpanded ? 'Ocultar comentarios' : 'Mostrar comentarios'} type="button">
-            <MessageCircle className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-primary-500" />
-            <span className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-primary-500">{comments.length}</span>
-          </button>
+          <ReactionsBar reactions={reactionsData} onReact={handleLike} reactionKind="evento" />
         </div>
-
-        {/* Comentarios */}
         {isCommentExpanded && (
           <div className="mt-4">
-            <div className="space-y-4">
-              {/* Lista de comentarios */}
-              {comments.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400 text-sm italic">
-                  No hay comentarios aún.
-                </p>
-              ) : (
-                comments.map((comment) => {
-                  const isAuthor = comment.autor_id === user?.id;
-                  const userData = commentUsers[comment.autor_id];
-                  return (
-                    <div key={comment.id} className="flex items-start space-x-3">
-                      <div className="flex-shrink-0">
-                        <img
-                          src={userData?.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(userData?.name || '')}
-                          alt={userData?.name}
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      </div>
-                      <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                            {userData?.name}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {format(new Date(comment.creado_en), 'dd MMM yyyy HH:mm', { locale: es })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-700 dark:text-gray-300">
-                          {comment.contenido}
-                        </p>
-                        <div className="flex items-center space-x-2 mt-2">
-                          <button
-                            onClick={async () => {
-                              if (!isAuthor) return;
-                              await supabase
-                                .from('comentarios_evento')
-                                .delete()
-                                .eq('id', comment.id);
-                              setComments(comments.filter(c => c.id !== comment.id));
-                            }}
-                            className="text-red-600 dark:text-red-400 text-xs flex items-center space-x-1 hover:underline"
-                            aria-label="Eliminar comentario"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            <span>Eliminar</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Formulario de nuevo comentario */}
+            <CommentThread
+              comments={commentThreadData}
+              onEdit={handleEditComment}
+              onDelete={handleDeleteComment}
+              onReply={handleReplyComment}
+              currentUserId={user ? user.id : undefined}
+            />
             {user && (
               <form onSubmit={handleAddComment} className="mt-4">
                 <div className="flex items-center space-x-3">
                   <div className="flex-shrink-0">
                     <img
-                      src={user.avatar_url || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.name)}
-                      alt={user.name}
+                      src={user.avatar || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.displayName || '')}
+                      alt={user.displayName || 'Usuario'}
                       className="h-8 w-8 rounded-full object-cover"
                     />
                   </div>
                   <div className="flex-1">
                     <textarea
+                      ref={commentInputRef}
                       value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
+                      onChange={handleTextareaChange}
                       className="w-full p-3 text-sm rounded-lg border focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
                       rows={2}
                       placeholder="Escribe un comentario..."
                       aria-label="Escribe un comentario"
                     />
+                    {/* Lista de menciones */}
+                    {showMentionList && mentionResults.length > 0 && (
+                      <div className="absolute z-50 bottom-12 left-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg w-64 max-h-60 overflow-y-auto">
+                        {mentionResults.map(user => (
+                          <button
+                            key={user.id}
+                            className="flex items-center w-full px-3 py-2 hover:bg-primary-50 dark:hover:bg-primary-900/30 gap-2 text-left"
+                            onClick={() => handleMentionSelect(user)}
+                            type="button"
+                          >
+                            <img src={user.avatar_url || '/default-avatar.png'} alt={user.nombre_usuario} className="w-6 h-6 rounded-full" />
+                            <span className="font-medium">@{user.nombre_usuario}</span>
+                            <span className="text-xs text-gray-400 ml-2">{user.nombre_completo}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                      onClick={() => setShowEmojiPicker((v) => !v)}
+                      aria-label="Insertar emoji"
+                      tabIndex={-1}
+                    >
+                      <span role="img" aria-label="emoji">😊</span>
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      aria-label="Agregar comentario"
+                    >
+                      <Send className="h-5 w-5" />
+                    </button>
+                    {showEmojiPicker && (
+                      <div className="absolute z-50 bottom-12 right-0">
+                        <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />
+                      </div>
+                    )}
                   </div>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    aria-label="Agregar comentario"
-                  >
-                    <Send className="h-5 w-5" />
-                  </button>
                 </div>
               </form>
             )}

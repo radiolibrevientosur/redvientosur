@@ -30,6 +30,7 @@ export interface Comment {
   userId: string;
   content: string;
   createdAt: string;
+  parent_id?: string | null;
   reactions?: CommentReaction[];
 }
 
@@ -41,7 +42,7 @@ interface PostState {
   fetchPosts: () => Promise<void>;
   addPost: (post: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments'>) => Promise<void>;
   toggleLike: (postId: string, userId: string) => Promise<void>;
-  addComment: (postId: string, userId: string, content: string) => Promise<void>;
+  addComment: (postId: string, userId: string, content: string, parentId?: string | null) => Promise<void>;
   toggleFavorite: (postId: string) => Promise<void>;
   getFavoritePosts: () => Post[];
 }
@@ -217,7 +218,7 @@ export const usePostStore = create<PostState>((set, get) => ({
     }
   },
 
-  addComment: async (postId, userId, content) => {
+  addComment: async (postId, userId, content, parentId = null) => {
     set({ isLoading: true });
     try {
       // Validar que el usuario existe en la tabla usuarios
@@ -243,7 +244,8 @@ export const usePostStore = create<PostState>((set, get) => ({
         .insert({
           post_id: postId,
           autor_id: userId,
-          contenido: content
+          contenido: content,
+          parent_id: parentId
         })
         .select()
         .single();

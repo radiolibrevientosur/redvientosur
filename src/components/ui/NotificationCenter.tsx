@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 // @ts-ignore
 import { Bell } from 'lucide-react';
+import { toast } from 'sonner';
 
 export interface Notification {
   id: string;
@@ -19,17 +20,9 @@ interface NotificationCenterProps {
   onMarkAsRead?: (id: string) => void;
 }
 
-const FILTERS = [
-  { label: 'Todas', value: 'all' },
-  { label: 'Mensajes', value: 'message' },
-  { label: 'Comentarios', value: 'comment' },
-  { label: 'Reacciones', value: 'reaction' },
-  { label: 'No leídas', value: 'unread' },
-];
-
 const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, onMarkAsRead }) => {
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState('all');
+  const [lastNotiId, setLastNotiId] = useState<string | null>(null);
   const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
@@ -41,60 +34,89 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ notifications, 
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  let filtered = notifications;
-  if (filter === 'unread') filtered = notifications.filter(n => !n.read);
-  else if (filter !== 'all') filtered = notifications.filter(n => n.type === filter);
+  // Mostrar toast emergente para nuevas notificaciones
+  useEffect(() => {
+    if (notifications.length === 0) return;
+    const latest = notifications[0];
+    if (lastNotiId && latest.id !== lastNotiId) {
+      toast(latest.title + ': ' + latest.description, {
+        action: {
+          label: 'Ver',
+          onClick: () => {
+            if (latest.link) window.location.href = latest.link;
+            setOpen(true);
+          }
+        },
+        duration: 6000
+      });
+    }
+    setLastNotiId(latest.id);
+    // eslint-disable-next-line
+  }, [notifications]);
+
+  // Cerrar el panel de notificaciones al hacer clic fuera
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      const notifPanel = document.getElementById('notification-center-panel');
+      if (notifPanel && !notifPanel.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
 
   return (
     <div className="relative">
       <button
-        className="relative p-2 rounded-full hover:bg-primary-100 dark:hover:bg-primary-900/30 focus:outline-none"
+        className="relative p-2 rounded-full hover:bg-primary-100 dark:hover:bg-primary-900/30 focus:outline-none group transition shadow-md border border-gray-200 dark:border-gray-800"
         onClick={() => setOpen(v => !v)}
         aria-label="Ver notificaciones"
+        style={{ boxShadow: open ? '0 0 0 3px #a5b4fc' : undefined, borderColor: open ? '#6366f1' : undefined }}
       >
-        <Bell className="h-6 w-6 text-gray-700 dark:text-gray-200" />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 font-bold animate-pulse">
-            {unreadCount}
-          </span>
-        )}
+        <span className="relative block">
+          <Bell className={`h-7 w-7 text-gray-700 dark:text-gray-200 group-hover:scale-110 transition-transform ${open ? 'text-primary-600 dark:text-primary-400' : ''}`} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-gradient-to-tr from-red-500 to-pink-500 text-white text-xs rounded-full px-2 py-0.5 font-bold shadow-lg border-2 border-white dark:border-gray-900 animate-bounce select-none pointer-events-none">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </span>
       </button>
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            id="notification-center-panel"
+            initial={{ opacity: 0, y: -16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute right-0 mt-2 w-80 max-w-xs bg-white dark:bg-gray-900 shadow-xl rounded-xl border border-gray-200 dark:border-gray-800 z-50"
+            exit={{ opacity: 0, y: -16 }}
+            className="absolute right-0 mt-2 w-96 max-w-xs bg-white dark:bg-gray-900 shadow-2xl rounded-2xl border border-gray-200 dark:border-gray-800 z-50 animate-fade-in"
           >
             <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-              <span className="font-bold text-gray-700 dark:text-gray-200">Notificaciones</span>
+              <span className="font-bold text-lg text-gray-700 dark:text-gray-200">Notificaciones</span>
               <button className="text-xs text-primary-600 hover:underline" onClick={() => setOpen(false)}>Cerrar</button>
             </div>
-            {/* Filtros */}
-            <div className="flex gap-2 px-4 py-2 border-b border-gray-100 dark:border-gray-800 text-xs">
-              {FILTERS.map(f => (
-                <button
-                  key={f.value}
-                  className={`px-2 py-1 rounded-full transition font-medium ${filter === f.value ? 'bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-300'}`}
-                  onClick={() => setFilter(f.value)}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <div className="max-h-96 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-              {filtered.length === 0 ? (
-                <div className="p-4 text-center text-gray-400">Sin notificaciones</div>
-              ) : filtered.map(n => (
+            {/* Lista vertical, sin fichas/filtros */}
+            <div className="max-h-96 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800 custom-scrollbar">
+              {notifications.length === 0 ? (
+                <div className="p-6 text-center text-gray-400 text-base">Sin notificaciones</div>
+              ) : notifications.map(n => (
                 <div
                   key={n.id}
-                  className={`p-4 flex flex-col gap-1 cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20 ${!n.read ? 'bg-primary-50/50 dark:bg-primary-900/10' : ''}`}
-                  onClick={() => { onMarkAsRead?.(n.id); setOpen(false); }}
+                  className={`flex gap-3 items-center px-4 py-3 cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-xl transition-all ${!n.read ? 'bg-primary-50/60 dark:bg-primary-900/10 border-l-4 border-primary-400' : ''}`}
+                  onClick={() => { onMarkAsRead?.(n.id); setOpen(false); if(n.link) window.location.href = n.link; }}
                 >
-                  <span className="font-semibold text-sm text-gray-800 dark:text-gray-100">{n.title}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{n.description}</span>
-                  <span className="text-[10px] text-gray-400 mt-1">{new Date(n.createdAt).toLocaleString()}</span>
+                  <span className="flex-shrink-0 text-2xl">
+                    {n.type === 'reaction' && '💖'}
+                    {n.type === 'comment' && '💬'}
+                    {n.type === 'message' && '✉️'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-semibold text-base text-gray-800 dark:text-gray-100 block truncate">{n.title}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400 block truncate">{n.description}</span>
+                    <span className="text-[11px] text-gray-400 mt-1 block">{new Date(n.createdAt).toLocaleString()}</span>
+                  </div>
                 </div>
               ))}
             </div>

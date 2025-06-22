@@ -39,6 +39,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { user: currentUser } = useAuthStore();
   const [likes, setLikes] = useState<string[]>(post.likes);
   const [comments, setComments] = useState(post.comments);
@@ -218,14 +219,42 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       const next = !v;
       if (next && menuButtonRef.current) {
         const rect = menuButtonRef.current.getBoundingClientRect();
-        setMenuPosition({
-          top: rect.bottom + window.scrollY,
-          left: rect.left + window.scrollX,
-        });
+        let left = rect.left + window.scrollX;
+        let top = rect.bottom + window.scrollY;
+        // Ajuste para móvil: evitar overflow a la derecha
+        if (isMobile) {
+          const menuWidth = 220; // Ancho estimado del menú
+          const padding = 8; // Espacio desde el borde derecho
+          const viewportWidth = window.innerWidth;
+          if (left + menuWidth > viewportWidth - padding) {
+            left = viewportWidth - menuWidth - padding;
+            if (left < padding) left = padding; // nunca menos que el padding
+          }
+        }
+        setMenuPosition({ top, left });
       }
       return next;
     });
   };
+  
+  // Cerrar menú al hacer clic fuera de él
+  useEffect(() => {
+    if (!showMenu) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        menuButtonRef.current &&
+        !menuButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showMenu]);
   
   // Log de depuración para detectar datos vacíos
   useEffect(() => {
@@ -321,6 +350,18 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
     setShowMentionList(false);
   };
   
+  // Eliminar comentario
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const { error } = await supabase.from('comentarios_post').delete().eq('id', commentId);
+      if (error) throw error;
+      setComments(comments.filter(c => c.id !== commentId));
+      toast.success('Comentario eliminado');
+    } catch {
+      toast.error('Error al eliminar el comentario');
+    }
+  };
+  
   if (!post || !postUser) {
     return null;
   }
@@ -392,11 +433,14 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
           </button>
           {showMenu && menuPosition && ReactDOM.createPortal(
             <div
+              ref={menuRef}
               className="z-[9999] bg-white dark:bg-gray-900 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 min-w-[180px] animate-fade-in"
               style={{
                 position: 'absolute',
                 top: menuPosition.top,
-                left: menuPosition.left,
+                left: isMobile ? menuPosition.left : menuPosition.left,
+                maxWidth: isMobile ? 220 : undefined,
+                right: isMobile ? undefined : undefined,
                 overflow: 'visible',
               }}
             >
@@ -476,6 +520,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
             comments={commentThreadData}
             onEdit={handleEditComment}
             onReply={handleReplyComment}
+            onDelete={handleDeleteComment}
           />
           {currentUser && (
             <form onSubmit={handleComment} className="flex items-center space-x-2 relative mt-2">

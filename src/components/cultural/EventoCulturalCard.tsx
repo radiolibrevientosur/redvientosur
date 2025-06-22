@@ -313,11 +313,23 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-none sm:rounded-lg shadow-md overflow-hidden mb-6 mx-0 sm:mx-auto">
-      <div className="relative h-48 w-full">
+      <div className="relative w-full flex justify-center items-center" style={{ minHeight: '120px', maxHeight: '80vh', background: 'transparent' }}>
         <img
           src={event.imagen_url || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80'}
           alt={event.titulo}
-          className="w-full h-full object-cover"
+          style={{
+            width: '100%',
+            height: '100%',
+            maxWidth: '470px',
+            maxHeight: '80vh',
+            objectFit: 'contain',
+            border: 'none',
+            borderRadius: 0,
+            background: 'transparent',
+            display: 'block',
+            margin: 0,
+            padding: 0
+          }}
         />
       </div>
 

@@ -279,7 +279,7 @@ const BlogsPage: React.FC = () => {
                   <img 
                     src={blog.coverImage} 
                     alt={blog.title} 
-                    className="w-full h-full object-cover rounded-none md:rounded-l-lg border-0 group-hover:scale-105 transition-transform duration-200"
+                    style={{ width: '100%', height: '100%', maxWidth: '470px', maxHeight: '80vh', objectFit: 'contain', border: 'none', borderRadius: 0, background: 'transparent', display: 'block', margin: 0, padding: 0 }}
                   />
                 </div>
                 <div className="p-6 md:w-2/3 flex flex-col justify-between">

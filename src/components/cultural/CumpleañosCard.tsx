@@ -369,11 +369,23 @@ const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onD
         </div>
 
         {birthday.imagen_url && (
-          <div className="mt-4">
+          <div className="mt-4 flex justify-center items-center" style={{ width: '100%', minHeight: '120px', maxHeight: '80vh', background: 'transparent' }}>
             <img
               src={birthday.imagen_url}
               alt={birthday.nombre}
-              className="w-full h-48 object-cover rounded-lg"
+              style={{
+                width: '100%',
+                height: '100%',
+                maxWidth: '470px',
+                maxHeight: '80vh',
+                objectFit: 'contain',
+                border: 'none',
+                borderRadius: 0,
+                background: 'transparent',
+                display: 'block',
+                margin: 0,
+                padding: 0
+              }}
             />
           </div>
         )}

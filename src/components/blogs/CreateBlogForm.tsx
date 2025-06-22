@@ -184,7 +184,7 @@ const CreateBlogForm: React.FC<CreateBlogFormProps> = ({ onSuccess }) => {
         <input type="file" accept="image/*" onChange={handleFileChange} disabled={isSubmitting} />
         {previewUrl && (
           <div className="mt-2 relative rounded-lg overflow-hidden">
-            <img src={previewUrl} alt="Previsualización" className="w-full max-h-48 object-cover rounded-lg border" />
+            <img src={previewUrl} alt="Previsualización" style={{ width: '100%', height: '100%', maxWidth: '470px', maxHeight: '80vh', objectFit: 'contain', border: 'none', borderRadius: 0, background: 'transparent', display: 'block', margin: 0, padding: 0 }} />
             {uploadProgress > 0 && uploadProgress < 100 && (
               <div className="absolute bottom-0 left-0 right-0 h-2 bg-primary-100">
                 <div className="h-2 bg-primary-600" style={{ width: `${uploadProgress}%` }} />

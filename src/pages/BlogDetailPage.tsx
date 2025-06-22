@@ -337,7 +337,7 @@ const BlogDetailPage: React.FC = () => {
         ← Volver a inicio
       </button>
       <div className="mb-4">
-        <img src={blog.coverImage} alt={blog.title} className="w-full h-64 object-cover rounded-lg mb-4" />
+        <img src={blog.coverImage} alt={blog.title} style={{ width: '100%', height: '100%', maxWidth: '470px', maxHeight: '80vh', objectFit: 'contain', border: 'none', borderRadius: 0, background: 'transparent', display: 'block', margin: 0, padding: 0 }} />
         <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mb-2">
           <span className="bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 px-2 py-0.5 rounded-full">
             {blog.category}
@@ -364,7 +364,6 @@ const BlogDetailPage: React.FC = () => {
               onEdit={handleEditComment}
               onDelete={handleDeleteComment}
               onReply={handleReplyComment}
-              currentUserId={user ? user.id : undefined}
             />
             {user && (
               <form onSubmit={handleComment} className="flex items-center space-x-2 relative mt-2">

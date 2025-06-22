@@ -380,6 +380,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
                   src={postUser?.avatar || '/default-avatar.png'} 
                   alt={postUser?.displayName || 'Usuario'} 
                   className="avatar-img"
+                  style={{ objectFit: 'cover', width: '100%', height: '100%', border: 'none', borderRadius: 0, background: 'transparent', margin: 0, padding: 0 }}
                 />
               )}
             </Link>
@@ -389,6 +390,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
                 src={postUser?.avatar || '/default-avatar.png'} 
                 alt={postUser?.displayName || 'Usuario'} 
                 className="avatar-img opacity-50"
+                style={{ objectFit: 'cover', width: '100%', height: '100%', border: 'none', borderRadius: 0, background: 'transparent', margin: 0, padding: 0 }}
               />
             </div>
           )}
@@ -531,6 +533,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
                   src={currentUser.avatar || '/default-avatar.png'} 
                   alt={currentUser.displayName || 'Usuario'} 
                   className="avatar-img rounded-full object-cover border border-primary-200 dark:border-primary-700"
+                  style={{ objectFit: 'cover', width: '100%', height: '100%', border: 'none', borderRadius: 0, background: 'transparent', margin: 0, padding: 0 }}
                 />
               </div>
               <input

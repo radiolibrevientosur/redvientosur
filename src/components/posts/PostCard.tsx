@@ -482,7 +482,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, disableCardNavigation, onDele
       </div>
       
       {/* Post Media */}
-      {media && media.length > 0 && <MediaCarousel media={media} />}
+      <div className="w-full flex justify-center items-center bg-white" style={{padding: 0, margin: 0}}>
+        {media && media.length > 0 && <MediaCarousel media={media} />}
+      </div>
       {/* Link Preview */}
       {linkData && <LinkPreview link={linkData} />}
       {/* Poll */}

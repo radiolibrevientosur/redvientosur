@@ -11,6 +11,7 @@ import ReactionsBar, { ReactionData } from '../shared/ReactionsBar';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { useDebounce } from 'use-debounce';
+import BottomSheetModal from '../shared/BottomSheetModal';
 
 
 
@@ -41,7 +42,6 @@ const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onD
   const [comments, setComments] = useState<any[]>([]);
   const [commentUsers, setCommentUsers] = useState<Record<string, any>>({});
   const [likes, setLikes] = useState<string[]>([]);
-  const [isCommentExpanded, setIsCommentExpanded] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
@@ -51,6 +51,8 @@ const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onD
   const commentInputRef = React.useRef<HTMLTextAreaElement>(null);
   const { user } = useAuthStore();
   const isLiked = user ? likes.includes(user.id) : false;
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   const isToday = (date: string) => {
     const today = new Date();
@@ -449,7 +451,9 @@ const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onD
           <ReactionsBar reactions={reactionsData} onReact={handleLike} reactionKind="cumpleanos" />
           <button
             className="flex items-center gap-1 text-gray-500 hover:text-primary-600 text-sm font-medium focus:outline-none"
-            onClick={() => setIsCommentExpanded((v) => !v)}
+            onClick={() => {
+              setShowCommentsModal(true);
+            }}
             aria-label="Mostrar comentarios"
             type="button"
           >
@@ -459,14 +463,20 @@ const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onD
             )}
           </button>
         </div>
-        {isCommentExpanded && (
-          <div className="mt-4">
+        {/* Modal de comentarios universal (móvil y escritorio) */}
+        {(isMobile || !isMobile) && (
+          <BottomSheetModal
+            open={showCommentsModal}
+            onClose={() => setShowCommentsModal(false)}
+            title="Comentarios"
+            height={isMobile ? '80vh' : '70vh'}
+            desktopMode={!isMobile}
+          >
             <CommentThread
               comments={commentThreadData}
               onEdit={handleEditComment}
               onDelete={handleDeleteComment}
               onReply={handleReplyComment}
-              currentUserId={user ? user.id : undefined}
             />
             {user && (
               <form onSubmit={handleAddComment} className="mt-4">
@@ -530,7 +540,7 @@ const CumpleañosCard: React.FC<CumpleañosCardProps> = ({ birthday, onEdit, onD
                 </div>
               </form>
             )}
-          </div>
+          </BottomSheetModal>
         )}
       </div>
     </div>

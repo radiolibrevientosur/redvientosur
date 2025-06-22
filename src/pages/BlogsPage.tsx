@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Book, Calendar, ArrowRight, Share2, MessageCircle, Heart } from 'lucide-react';
+import { Book, Calendar, Share2, MessageCircle, Heart } from 'lucide-react';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import SuggestionsToFollow from '../components/profile/SuggestionsToFollow';
+import BottomSheetModal from '../components/shared/BottomSheetModal';
+import CommentThread from '../components/shared/CommentThread';
 
 interface BlogPost {
   id: string;
@@ -34,9 +36,7 @@ const BlogsPage: React.FC = () => {
   const [blogs, setBlogs] = useState<BlogPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('Todos');
-  const [expandedBlogId, setExpandedBlogId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, any[]>>({});
-  const [loadingComments, setLoadingComments] = useState<string | null>(null);
   const { user } = useAuthStore();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -44,7 +44,8 @@ const BlogsPage: React.FC = () => {
   const [commentText, setCommentText] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const commentInputRef = React.useRef<HTMLInputElement>(null);
-  const [isCommentExpanded, setIsCommentExpanded] = useState<Record<string, boolean>>({});
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const [selectedBlogId, setSelectedBlogId] = useState<string | null>(null);
   const [likedBlogs, setLikedBlogs] = useState<string[]>([]);
   const [likeLoading, setLikeLoading] = useState<string | null>(null);
 
@@ -113,18 +114,18 @@ const BlogsPage: React.FC = () => {
 
   const handleShowComments = async (blogId: string) => {
     if (comments[blogId]) {
-      setExpandedBlogId(expandedBlogId === blogId ? null : blogId);
+      setSelectedBlogId(blogId);
+      setShowCommentsModal(true);
       return;
     }
-    setLoadingComments(blogId);
     const { data } = await supabase
       .from('comentarios_blog')
       .select('id, contenido, creado_en, autor:usuarios(id, nombre_completo, avatar_url)')
       .eq('publicacion_id', blogId)
       .order('creado_en', { ascending: true });
     setComments(prev => ({ ...prev, [blogId]: data || [] }));
-    setExpandedBlogId(blogId);
-    setLoadingComments(null);
+    setSelectedBlogId(blogId);
+    setShowCommentsModal(true);
   };
 
   const handleAddComment = async (blogId: string) => {
@@ -324,6 +325,8 @@ const BlogsPage: React.FC = () => {
                       <button
                         className="flex items-center space-x-1 group"
                         onClick={() => handleShowComments(blog.id)}
+                        aria-label="Mostrar comentarios"
+                        tabIndex={0}
                       >
                         <MessageCircle className="h-5 w-5 text-gray-600 dark:text-gray-400 group-hover:text-primary-500" />
                         <span className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-primary-500">{blog.commentsCount || 0}</span>
@@ -339,105 +342,61 @@ const BlogsPage: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                  {/* Comentarios visual estilo PostCard */}
-                  {expandedBlogId === blog.id && (
-                    <div className="px-0 py-3 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl mt-4">
-                      {loadingComments === blog.id ? (
-                        <div className="text-center py-4 text-gray-400">Cargando comentarios...</div>
-                      ) : (
-                        <>
-                          {comments[blog.id] && comments[blog.id].length > 0 && (
-                            <div className="mb-3 space-y-3">
-                              {comments[blog.id].slice(0, isCommentExpanded[blog.id] ? undefined : 2).map(comment => (
-                                <div key={comment.id} className="flex space-x-2">
-                                  <div className="flex-shrink-0">
-                                    <div className="avatar w-8 h-8">
-                                      <img
-                                        src={comment.autor?.avatar_url || '/default-avatar.png'}
-                                        alt={comment.autor?.nombre_completo || 'Usuario'}
-                                        className="avatar-img"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="bg-white dark:bg-gray-900 p-2 rounded-lg">
-                                      <p className="font-medium text-sm text-gray-900 dark:text-white">
-                                        {comment.autor?.nombre_completo || 'Usuario'}
-                                      </p>
-                                      <p className="text-sm text-gray-700 dark:text-gray-300">
-                                        {comment.contenido}
-                                      </p>
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                      {new Date(comment.creado_en).toLocaleDateString('es-ES')}
-                                    </p>
-                                  </div>
-                                </div>
-                              ))}
-                              {(comments[blog.id].length > 2 && !isCommentExpanded[blog.id]) && (
-                                <button
-                                  onClick={() => setIsCommentExpanded(prev => ({ ...prev, [blog.id]: true }))}
-                                  className="text-sm text-primary-600 dark:text-primary-400 font-medium"
-                                >
-                                  Ver los {comments[blog.id].length} comentarios
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          {user && (
-                            <form onSubmit={e => { e.preventDefault(); handleAddComment(blog.id); }} className="flex items-center space-x-2 relative">
-                              <div className="avatar w-8 h-8">
-                                <img
-                                  src={user.avatar}
-                                  alt={user.displayName}
-                                  className="avatar-img"
-                                />
-                              </div>
-                              <input
-                                ref={commentInputRef}
-                                type="text"
-                                placeholder="Añade un comentario..."
-                                className="flex-1 bg-white dark:bg-gray-900 rounded-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                                value={newComment}
-                                onChange={e => setNewComment(e.target.value)}
-                              />
-                              <button
-                                type="button"
-                                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                                onClick={() => setShowEmojiPicker((v) => !v)}
-                                aria-label="Insertar emoji"
-                                tabIndex={-1}
-                              >
-                                <span role="img" aria-label="emoji">😊</span>
-                              </button>
-                              <button
-                                type="submit"
-                                disabled={!newComment.trim() || isSubmitting}
-                                className="text-sm font-medium text-primary-600 dark:text-primary-400 disabled:opacity-50"
-                              >
-                                Publicar
-                              </button>
-                              {showEmojiPicker && (
-                                <div className="absolute z-50 bottom-12 right-0">
-                                  <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />
-                                </div>
-                              )}
-                            </form>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {/* Fin comentarios visual */}
-                  <div className="flex items-center gap-4 mt-4">
-                    <Link
-                      to={`/blogs/${blog.id}`}
-                      className="btn btn-primary px-4 py-2 rounded-full text-white font-semibold shadow hover:scale-105 transition-transform duration-150"
-                      tabIndex={0}
-                    >
-                      Leer artículo <ArrowRight className="inline ml-2 h-4 w-4" />
-                    </Link>
-                  </div>
+                  {/* Modal de comentarios universal (móvil y escritorio) */}
+                  <BottomSheetModal
+                    open={showCommentsModal}
+                    onClose={() => setShowCommentsModal(false)}
+                    title="Comentarios"
+                    height={window.innerWidth < 640 ? '80vh' : '70vh'}
+                    desktopMode={window.innerWidth >= 640}
+                  >
+                    {selectedBlogId && (
+                      <CommentThread
+                        comments={comments[selectedBlogId] || []}
+                        // Puedes agregar onEdit, onReply, etc. si lo necesitas
+                      />
+                    )}
+                    {user && selectedBlogId && (
+                      <form onSubmit={e => { e.preventDefault(); handleAddComment(selectedBlogId); }} className="flex items-center space-x-2 relative mt-2">
+                        <div className="avatar w-9 h-9">
+                          <img 
+                            src={user.avatar || '/default-avatar.png'} 
+                            alt={user.displayName}
+                            className="avatar-img"
+                          />
+                        </div>
+                        <input
+                          ref={commentInputRef}
+                          type="text"
+                          placeholder="Añade un comentario..."
+                          className="flex-1 bg-white dark:bg-gray-900 rounded-full px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                          value={newComment}
+                          onChange={e => setNewComment(e.target.value)}
+                        />
+                        <button
+                          type="button"
+                          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+                          onClick={() => setShowEmojiPicker((v) => !v)}
+                          aria-label="Insertar emoji"
+                          tabIndex={-1}
+                        >
+                          <span role="img" aria-label="emoji">😊</span>
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!newComment.trim() || isSubmitting}
+                          className="text-sm font-medium text-primary-600 dark:text-primary-400 disabled:opacity-50"
+                        >
+                          Publicar
+                        </button>
+                        {showEmojiPicker && (
+                          <div className="absolute z-50 bottom-12 right-0">
+                            <Picker data={data} onEmojiSelect={handleEmojiSelect} theme="auto" />
+                          </div>
+                        )}
+                      </form>
+                    )}
+                  </BottomSheetModal>
                 </div>
               </div>
             </article>

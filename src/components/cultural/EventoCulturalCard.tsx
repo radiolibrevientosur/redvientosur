@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
-  Heart, 
   MessageCircle, 
   Send,
   MoreHorizontal
@@ -17,6 +16,7 @@ import ReactionsBar, { ReactionData } from '../shared/ReactionsBar';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import { useDebounce } from 'use-debounce';
+import BottomSheetModal from '../shared/BottomSheetModal';
 
 interface EventoCulturalCardProps {
   event: {
@@ -51,7 +51,6 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
   const [comments, setComments] = useState<any[]>([]);
   const [commentUsers, setCommentUsers] = useState<Record<string, any>>({});
   const [likes, setLikes] = useState<string[]>([]);
-  const [isCommentExpanded, setIsCommentExpanded] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionResults, setMentionResults] = useState<any[]>([]);
@@ -61,6 +60,8 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
   const { user } = useAuthStore();
   const isCreator = user && event.userId && user.id === event.userId;
   const isLiked = user ? likes.includes(user.id) : false;
+  const [showCommentsModal, setShowCommentsModal] = useState(false);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
   React.useEffect(() => {
     // Cargar comentarios y usuarios
@@ -398,15 +399,34 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
         {/* Reacciones y comentarios */}
         <div className="flex items-center space-x-6 mb-4">
           <ReactionsBar reactions={reactionsData} onReact={handleLike} reactionKind="evento" />
+          <button
+            className="flex items-center gap-1 text-gray-500 hover:text-primary-600 text-sm font-medium focus:outline-none"
+            onClick={() => {
+              setShowCommentsModal(true);
+            }}
+            aria-label="Mostrar comentarios"
+            type="button"
+          >
+            <MessageCircle className="w-5 h-5" />
+            {comments.length > 0 && (
+              <span className="ml-1 text-xs bg-gray-200 dark:bg-gray-700 rounded-full px-2 py-0.5">{comments.length}</span>
+            )}
+          </button>
         </div>
-        {isCommentExpanded && (
-          <div className="mt-4">
+        {/* Modal de comentarios universal (móvil y escritorio) */}
+        {(isMobile || !isMobile) && (
+          <BottomSheetModal
+            open={showCommentsModal}
+            onClose={() => setShowCommentsModal(false)}
+            title="Comentarios"
+            height={isMobile ? '80vh' : '70vh'}
+            desktopMode={!isMobile}
+          >
             <CommentThread
               comments={commentThreadData}
               onEdit={handleEditComment}
               onDelete={handleDeleteComment}
               onReply={handleReplyComment}
-              currentUserId={user ? user.id : undefined}
             />
             {user && (
               <form onSubmit={handleAddComment} className="mt-4">
@@ -470,7 +490,7 @@ const EventoCulturalCard: React.FC<EventoCulturalCardProps> = ({ event, onEdit, 
                 </div>
               </form>
             )}
-          </div>
+          </BottomSheetModal>
         )}
       </div>
     </div>

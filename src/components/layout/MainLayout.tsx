@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import BottomNavigation from './BottomNavigation';
 import LeftSidebar from './LeftSidebar';
@@ -11,6 +11,13 @@ const MainLayout: React.FC = () => {
   const [leftOpen, setLeftOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   const [showConversations, setShowConversations] = useState(false);
+
+  // Permite abrir el modal de conversaciones desde cualquier parte (ej: botón flotante homepage)
+  useEffect(() => {
+    const openModal = () => setShowConversations(true);
+    window.addEventListener('openConversationsModal', openModal);
+    return () => window.removeEventListener('openConversationsModal', openModal);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">

@@ -216,19 +216,7 @@ const HomePage = () => {
         </div>
       )}
       {/* Botón flotante para escribir mensaje, igual que el de crear blog */}
-      <div className="fixed bottom-20 right-4 z-40">
-        <button
-          className="btn btn-primary rounded-full p-4 shadow-lg text-lg flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-          onClick={() => window.dispatchEvent(new CustomEvent('openConversationsModal'))}
-          aria-label="Escribir mensaje"
-          tabIndex={0}
-        >
-          {/* Cambia el icono por una burbuja de mensajes (MessageCircle de lucide-react) */}
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-6 w-6">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 12c0 4.556-4.686 8.25-9.75 8.25-1.13 0-2.25-.17-3.3-.5l-4.2 1.25a.75.75 0 01-.94-.94l1.25-4.2c-.33-1.05-.5-2.17-.5-3.3C2.25 7.186 5.944 2.5 12 2.5s9.75 4.686 9.75 9.5z" />
-          </svg>
-        </button>
-      </div>
+      {/* Eliminado según solicitud UX */}
     </div>
   );
 };

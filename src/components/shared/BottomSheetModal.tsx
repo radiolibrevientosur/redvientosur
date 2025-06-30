@@ -7,9 +7,10 @@ interface BottomSheetModalProps {
   children: React.ReactNode;
   height?: string; // e.g. '70vh'
   desktopMode?: boolean; // Nuevo: para modal centrado en escritorio
+  className?: string; // NUEVO: permite personalizar el modal
 }
 
-const BottomSheetModal: React.FC<BottomSheetModalProps> = ({ open, onClose, title, children, height = '70vh', desktopMode = false }) => {
+const BottomSheetModal: React.FC<BottomSheetModalProps> = ({ open, onClose, title, children, height = '70vh', desktopMode = false, className }) => {
   const sheetRef = useRef<HTMLDivElement>(null);
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -62,8 +63,8 @@ const BottomSheetModal: React.FC<BottomSheetModalProps> = ({ open, onClose, titl
       />
       <div
         ref={sheetRef}
-        className={`relative bg-white dark:bg-gray-900 shadow-lg animate-slideUp ${desktopMode ? 'rounded-2xl w-full max-w-lg mx-auto' : 'rounded-t-2xl w-full max-w-md mx-auto'}`}
-        style={desktopMode ? { height: '70vh', maxHeight: '90vh', overflow: 'hidden' } : { height, maxHeight: '90vh', overflow: 'hidden' }}
+        className={`relative bg-white dark:bg-gray-900 shadow-lg animate-slideUp ${desktopMode ? 'rounded-2xl w-full max-w-lg mx-auto' : 'rounded-t-2xl w-full max-w-md mx-auto'}${className ? ' ' + className : ''}`}
+        style={{ height, maxHeight: '100vh', overflow: 'hidden' }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

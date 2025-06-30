@@ -4,9 +4,10 @@ import { useDirectMessages, Message } from '../../hooks/useDirectMessages';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import AudioRecorder from '../ui/AudioRecorder';
-import { Mic, MoreVertical, Image as ImageIcon, Music, FileText } from 'lucide-react';
+import { FiMoreHorizontal, FiSmile, FiSend, FiMic, FiImage, FiMusic, FiFileText } from 'react-icons/fi';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
+import { blockUser, reportConversation } from '../../lib/chatActions';
 
 interface ChatWindowProps {
   otherUserId: string;
@@ -32,6 +33,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
   const docInputRef = useRef<HTMLInputElement>(null);
   const audioRecorderRef = useRef<any>(null);
   const [isMicPressed, setIsMicPressed] = useState(false);
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const chatMenuRef = useRef<HTMLDivElement>(null);
 
   // Variables para gestos
   const micStartPos = useRef<{ x: number; y: number } | null>(null);
@@ -41,6 +44,38 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
   const DRAG_LEFT_THRESHOLD = 60; // px
   const DRAG_UP_THRESHOLD = 60; // px
 
+  // Estado local para usuarios bloqueados
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const [blockedByIds, setBlockedByIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function fetchBlocked() {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('blocked_users')
+        .select('blocked_id')
+        .eq('blocker_id', user.id);
+      if (!error && data) {
+        setBlockedIds(data.map((b: any) => b.blocked_id));
+      }
+    }
+    fetchBlocked();
+  }, [user]);
+
+  useEffect(() => {
+    async function fetchBlockedBy() {
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('blocked_users')
+        .select('blocker_id, blocked_id')
+        .eq('blocked_id', user.id);
+      if (!error && data) {
+        setBlockedByIds(data.map((b: any) => b.blocker_id));
+      }
+    }
+    fetchBlockedBy();
+  }, [user]);
+
   useEffect(() => {
     if (user?.id && otherUserId) fetchMessages(otherUserId);
   }, [user, otherUserId, fetchMessages]);
@@ -49,8 +84,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Impedir enviar mensajes a usuarios bloqueados
+  const isBlocked = blockedIds.includes(otherUserId) || blockedByIds.includes(otherUserId);
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isBlocked) {
+      toast.error('No puedes enviar mensajes a este usuario.');
+      return;
+    }
     if ((!input.trim() && !audioUrl) || loading) return;
     if (audioUrl) {
       await sendMessage(otherUserId, audioUrl); // solo dos argumentos
@@ -210,20 +252,102 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
     setActionMenuMsgId(null);
   };
 
+  // Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (chatMenuRef.current && !chatMenuRef.current.contains(event.target as Node)) {
+        setShowChatMenu(false);
+      }
+    }
+    if (showChatMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showChatMenu]);
+
   return (
-    <div className="flex flex-col h-full border rounded shadow bg-white max-w-full sm:max-w-md mx-auto w-full min-h-[80vh] sm:min-h-[500px] relative md:rounded-xl md:shadow-lg md:border md:bg-white">
-      <div className="p-2 border-b font-semibold flex items-center gap-2 bg-white sticky top-0 z-10 min-h-[48px] sm:min-h-[56px] md:rounded-t-xl">
+    <div className="flex flex-col w-full h-full">
+      {/* Header mejorado */}
+      <div className="p-3 border-b font-semibold flex items-center gap-3 bg-gradient-to-r from-pink-100 via-purple-100 to-blue-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-900 sticky top-0 z-10 min-h-[56px] md:rounded-t-xl shadow-sm">
         {otherUserAvatar && (
-          <img src={otherUserAvatar} alt={otherUserName || otherUserId} className="w-9 h-9 rounded-full object-cover" />
+          <img src={otherUserAvatar} alt={otherUserName || otherUserId} className="w-10 h-10 rounded-full object-cover border-2 border-pink-400" />
         )}
-        <span className="truncate text-base sm:text-lg">Chat con {otherUserName || otherUserId}</span>
+        <div className="flex flex-col flex-1 min-w-0">
+          <span className="truncate text-base sm:text-lg font-bold text-gray-900 dark:text-white">{otherUserName || otherUserId}</span>
+          <span className="text-xs text-pink-500 font-medium">● En línea</span>
+        </div>
+        <div className="relative">
+          <button
+            className="p-2 rounded-full hover:bg-pink-100 dark:hover:bg-gray-800 text-pink-500"
+            title="Más opciones"
+            onClick={() => setShowChatMenu((v) => !v)}
+            aria-haspopup="true"
+            aria-expanded={showChatMenu}
+            aria-label="Abrir menú de chat"
+          >
+            <FiMoreHorizontal className="w-5 h-5" />
+          </button>
+          {showChatMenu && (
+            <div ref={chatMenuRef} className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 z-50 animate-fade-in">
+              <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                <li>
+                  <button
+                    className="block w-full text-left px-4 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded"
+                    onClick={() => { setShowChatMenu(false); toast('Función de eliminar chat próximamente'); }}
+                  >Eliminar chat</button>
+                </li>
+                <li>
+                  <button
+                    className="block w-full text-left px-4 py-2 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded"
+                    onClick={async () => {
+                      setShowChatMenu(false);
+                      if (!user) return;
+                      try {
+                        await blockUser(user.id, otherUserId);
+                        toast.success('Usuario bloqueado. No recibirás más mensajes de este usuario.');
+                      } catch (err) {
+                        toast.error('Error al bloquear usuario');
+                      }
+                    }}
+                  >Bloquear chat</button>
+                </li>
+                <li>
+                  <button
+                    className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 rounded"
+                    onClick={async () => {
+                      setShowChatMenu(false);
+                      if (!user) return;
+                      const reason = window.prompt('¿Por qué deseas reportar esta conversación? (opcional)', '');
+                      try {
+                        // Buscar la conversación entre ambos usuarios
+                        const { data: conv, error: convError } = await supabase
+                          .from('conversations')
+                          .select('id')
+                          .or(`and(user1.eq.${user.id},user2.eq.${otherUserId}),and(user1.eq.${otherUserId},user2.eq.${user.id})`)
+                          .maybeSingle();
+                        if (convError) throw convError;
+                        if (!conv) throw new Error('No se encontró la conversación');
+                        await reportConversation(conv.id, user.id, reason || '');
+                        toast.success('Conversación reportada');
+                      } catch (err) {
+                        toast.error('Error al reportar la conversación');
+                      }
+                    }}
+                  >Reportar</button>
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-2 bg-gray-50 hide-scrollbar min-h-[60vh] max-h-[70vh] md:rounded-b-xl">
+      {/* Mensajes con burbujas modernas y animaciones */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 bg-gray-50 hide-scrollbar min-h-[60vh] max-h-[70vh] md:rounded-b-xl transition-all duration-300">
         {loading ? (
-          <div>Cargando mensajes...</div>
+          <div className="text-center text-gray-400">Cargando mensajes...</div>
         ) : (
           messages.map((msg: Message) => {
-            // Detectar si el mensaje es un archivo adjunto (url de supabase)
             const isFile = msg.content && msg.content.startsWith('http');
             let filePreview = null;
             if (isFile) {
@@ -240,9 +364,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
             }
             const isOwn = msg.sender_id === user?.id;
             return (
-              <div key={msg.id} className="relative group">
+              <div key={msg.id} className={`relative group flex ${isOwn ? 'justify-end' : 'justify-start'} animate-fade-in`}>
                 <div
-                  className={`max-w-xs px-3 py-2 rounded-lg text-sm shadow-md ${isOwn ? 'bg-blue-600 text-white ml-auto' : 'bg-gray-700 text-white mr-auto'}`}
+                  className={`max-w-xs px-4 py-2 rounded-2xl text-sm shadow-md transition-all duration-200 ${isOwn ? 'bg-primary-600 text-white rounded-br-md' : 'bg-white text-gray-900 border rounded-bl-md'} relative`}
                   onContextMenu={e => { e.preventDefault(); setActionMenuMsgId(msg.id); }}
                   onClick={() => setActionMenuMsgId(msg.id)}
                   tabIndex={0}
@@ -250,20 +374,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
                 >
                   {/* Si es respuesta */}
                   {msg.reply_to && (
-                    <div className="text-xs text-blue-200 mb-1 border-l-2 border-blue-300 pl-2 italic">Respondiendo a: {msg.reply_to.content?.slice(0, 40)}...</div>
+                    <div className="text-xs text-blue-400 mb-1 border-l-2 border-blue-300 pl-2 italic">↩️ {msg.reply_to.content?.slice(0, 40)}...</div>
                   )}
-                  {isFile ? filePreview : msg.content}
+                  {isFile ? filePreview : <span className="whitespace-pre-line break-words">{msg.content}</span>}
                   {/* Reacciones visuales */}
                   {reactions[msg.id] && (
                     <div className="mt-1 flex items-center gap-1">
                       <span className="bg-white/80 text-black rounded-full px-2 py-0.5 text-base border border-gray-200">{reactions[msg.id]}</span>
                     </div>
                   )}
-                  <div className="text-[10px] text-gray-300 text-right mt-1">{new Date(msg.created_at).toLocaleTimeString()}</div>
+                  <div className="text-[10px] text-gray-400 text-right mt-1">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
                 {/* Menú contextual de acciones rápidas */}
                 {actionMenuMsgId === msg.id && (
-                  <div className="absolute -top-14 right-0 bg-white dark:bg-gray-800 shadow-lg rounded-xl p-2 flex space-x-2 z-30 border animate-fade-in">
+                  <div className={`absolute ${isOwn ? 'right-0' : 'left-0'} -top-14 bg-white dark:bg-gray-800 shadow-lg rounded-xl p-2 flex space-x-2 z-30 border animate-fade-in`}> 
                     <button onClick={() => handleAddReaction(msg.id, '👍')} className="p-1 rounded hover:bg-primary-100" title="Reaccionar">👍</button>
                     <button onClick={() => handleAddReaction(msg.id, '😂')} className="p-1 rounded hover:bg-primary-100" title="Reaccionar">😂</button>
                     <button onClick={() => handleAddReaction(msg.id, '❤️')} className="p-1 rounded hover:bg-primary-100" title="Reaccionar">❤️</button>
@@ -279,13 +403,13 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
       </div>
       {/* Campo de respuesta visual */}
       {replyTo && (
-        <div className="flex items-center gap-2 mb-2 bg-blue-50 rounded px-3 py-1">
+        <div className="flex items-center gap-2 mb-2 bg-blue-50 rounded px-3 py-1 animate-fade-in">
           <span className="text-xs truncate">Respondiendo a: {replyTo.content?.slice(0, 40)}...</span>
           <button onClick={() => setReplyTo(null)} className="ml-auto text-gray-400 hover:text-red-500">✕</button>
         </div>
       )}
-      {/* ...existing code para el formulario de envío... */}
-      <form onSubmit={e => { handleSend(e); setReplyTo(null); }} className="p-2 border-t flex gap-2 items-center relative bg-white sticky bottom-0 z-20 md:rounded-b-xl">
+      {/* Barra de input mejorada */}
+      <form onSubmit={e => { handleSend(e); setReplyTo(null); }} className="p-2 border-t flex gap-2 items-center relative bg-white sticky bottom-0 z-20 md:rounded-b-xl shadow-sm">
         <input
           ref={fileInputRef}
           type="file"
@@ -312,34 +436,34 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
         />
         <button
           type="button"
-          className="p-2 rounded hover:bg-gray-100 text-xl"
+          className="p-2 rounded hover:bg-pink-100 text-xl text-pink-500"
           aria-label="Más opciones"
           onClick={() => setShowOptions(v => !v)}
           tabIndex={-1}
         >
-          <MoreVertical className="w-5 h-5" />
+          <FiMoreHorizontal className="w-5 h-5" />
         </button>
         {showOptions && (
           <div className="absolute bottom-12 left-0 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 flex flex-col gap-2 min-w-[180px] animate-fade-in">
-            <button type="button" className="flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => handleFileSelect('media')}>
-              <ImageIcon className="w-5 h-5 text-blue-500" /> Foto/Video
+            <button type="button" className="flex items-center gap-2 p-2 rounded hover:bg-pink-100 dark:hover:bg-gray-800" onClick={() => handleFileSelect('media')}>
+              <FiImage className="w-5 h-5 text-pink-500" /> Foto/Video
             </button>
-            <button type="button" className="flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => handleFileSelect('music')}>
-              <Music className="w-5 h-5 text-green-500" /> Música
+            <button type="button" className="flex items-center gap-2 p-2 rounded hover:bg-pink-100 dark:hover:bg-gray-800" onClick={() => handleFileSelect('music')}>
+              <FiMusic className="w-5 h-5 text-purple-500" /> Música
             </button>
-            <button type="button" className="flex items-center gap-2 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800" onClick={() => handleFileSelect('doc')}>
-              <FileText className="w-5 h-5 text-yellow-500" /> Documento
+            <button type="button" className="flex items-center gap-2 p-2 rounded hover:bg-pink-100 dark:hover:bg-gray-800" onClick={() => handleFileSelect('doc')}>
+              <FiFileText className="w-5 h-5 text-blue-500" /> Documento
             </button>
           </div>
         )}
         <button
           type="button"
-          className="p-2 rounded hover:bg-gray-100 text-xl"
+          className="p-2 rounded hover:bg-pink-100 text-xl text-pink-500"
           aria-label="Emojis"
           onClick={() => setShowEmojiPicker(v => !v)}
           tabIndex={-1}
         >
-          😊
+          <FiSmile className="w-5 h-5" />
         </button>
         {showEmojiPicker && (
           <div className="absolute bottom-12 left-12 z-50">
@@ -347,18 +471,18 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
           </div>
         )}
         <input
-          className="flex-1 border rounded px-3 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-400 text-base md:text-lg"
+          className="flex-1 border rounded-full px-4 py-2 bg-white text-black focus:outline-none focus:ring-2 focus:ring-primary-400 text-base md:text-lg shadow-sm"
           value={input}
           onChange={e => setInput(e.target.value)}
           placeholder="Escribe un mensaje..."
         />
         {input.trim() ? (
-          <button type="submit" className="bg-blue-700 text-white px-4 py-1 rounded hover:bg-blue-800 transition">Enviar</button>
+          <button type="submit" className="bg-gradient-to-tr from-pink-500 via-purple-500 to-blue-500 text-white px-4 py-1 rounded-full hover:scale-105 transition font-semibold shadow flex items-center gap-2"><FiSend className="w-5 h-5" />Enviar</button>
         ) : (
           <div className="relative">
             <button
               type="button"
-              className={`p-2 rounded hover:bg-gray-100 text-xl ${isMicPressed ? 'bg-red-100' : ''}`}
+              className={`p-2 rounded-full hover:bg-pink-100 text-xl text-pink-500 ${isMicPressed ? 'bg-red-100' : ''}`}
               aria-label="Grabar audio"
               onMouseDown={handleMicDown}
               onTouchStart={handleMicDown}
@@ -370,7 +494,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ otherUserId, otherUserNa
               onTouchCancel={handleMicLeaveOrCancel}
               tabIndex={-1}
             >
-              <Mic className="w-5 h-5" />
+              <FiMic className="w-5 h-5" />
             </button>
             {renderMicGestureHint()}
           </div>
